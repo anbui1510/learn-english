@@ -1,0 +1,14 @@
+{
+  "id": "fact-example-001",
+  "source_quote": "Fever is a common presenting symptom in pediatric infectious disease.",
+  "metadata": {
+    "isbn": "978-0323529501",
+    "edition": "21st",
+    "page": 1024,
+    "chapter": "Infectious Diseases",
+    "section": "Fever"
+  },
+  "atomic_fact": "Fever is a common presenting symptom of pediatric infectious disease.",
+  "category": "symptom",
+  "status": "needs_review"
+}

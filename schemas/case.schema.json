@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://learn-english.local/schemas/case.schema.json",
+  "title": "Case",
+  "description": "Clinical case owned by an editor (or admin) user for MVP B ingest/review.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["owner_user_id", "title", "status"],
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "owner_user_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Users.id of the owning editor or admin (never a learner)."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "published"]
+    },
+    "isbn": {
+      "type": "string",
+      "minLength": 1
+    },
+    "edition": {
+      "type": "string",
+      "minLength": 1
+    },
+    "created_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "updated_at": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

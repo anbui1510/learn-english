@@ -1,0 +1,11 @@
+{
+  "id": "fact-example-invalid-001",
+  "metadata": {
+    "isbn": "978-0323529501",
+    "edition": "21st",
+    "page": 1024
+  },
+  "atomic_fact": "Example atomic fact missing required citation quote.",
+  "category": "symptom",
+  "status": "published"
+}

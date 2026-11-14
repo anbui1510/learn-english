@@ -3,3 +3,39 @@ _bmad-output/
 
 # Personal BMad config (see _bmad/custom/.gitignore)
 _bmad/custom/*.user.toml
+
+# Secrets / local env
+.env
+backend/.env
+frontend/.env
+
+# Local SQLite (MVP user/role store)
+backend/data/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+
+# Node
+node_modules/
+frontend/dist/
+*.local
+.npm
+.vite/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
