@@ -7,6 +7,7 @@ import jwt
 from fastapi import HTTPException, Request, Response, status
 
 from app.auth.settings import AuthSettings
+from app.users.roles import Role
 
 
 def create_session_token(
@@ -15,6 +16,7 @@ def create_session_token(
     sub: str,
     email: str,
     name: str | None = None,
+    role: Role | None = None,
 ) -> str:
     now = datetime.now(UTC)
     payload: dict[str, Any] = {
@@ -25,6 +27,8 @@ def create_session_token(
     }
     if name:
         payload["name"] = name
+    if role:
+        payload["role"] = role
     return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
 
 
@@ -60,7 +64,9 @@ def clear_session_cookie(response: Response, settings: AuthSettings) -> None:
     )
 
 
-def current_user_from_request(request: Request, settings: AuthSettings) -> dict[str, Any]:
+def current_identity_from_request(
+    request: Request, settings: AuthSettings
+) -> dict[str, Any]:
     token = request.cookies.get(settings.cookie_name)
     if not token:
         raise HTTPException(
@@ -79,4 +85,10 @@ def current_user_from_request(request: Request, settings: AuthSettings) -> dict[
         "sub": sub,
         "email": email,
         "name": claims.get("name"),
+        "role": claims.get("role"),
     }
+
+
+# Back-compat alias used by older tests / callers
+def current_user_from_request(request: Request, settings: AuthSettings) -> dict[str, Any]:
+    return current_identity_from_request(request, settings)

@@ -7,27 +7,13 @@ from fastapi.testclient import TestClient
 
 from app.auth.jwt_tokens import create_session_token
 from app.auth.oauth import reset_oauth_registration
-from app.auth.settings import AuthSettings, clear_auth_settings_cache
+from app.auth.settings import AuthSettings, clear_auth_settings_cache, get_auth_settings
 from app.main import create_app
+from app.users.service import clear_user_repository_cache
 
 
 @pytest.fixture
-def auth_settings(monkeypatch: pytest.MonkeyPatch) -> AuthSettings:
-    monkeypatch.setenv("GOOGLE_CLIENT_ID", "test-client-id")
-    monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "test-client-secret")
-    monkeypatch.setenv(
-        "GOOGLE_REDIRECT_URI",
-        "http://127.0.0.1:8000/auth/google/callback",
-    )
-    monkeypatch.setenv("JWT_SECRET", "test-jwt-secret-at-least-32-chars!!")
-    monkeypatch.setenv("SESSION_SECRET", "test-session-secret")
-    monkeypatch.setenv("FRONTEND_ORIGIN", "http://127.0.0.1:5173")
-    monkeypatch.setenv("COOKIE_NAME", "le_session")
-    monkeypatch.setenv("COOKIE_SECURE", "false")
-    clear_auth_settings_cache()
-    reset_oauth_registration()
-    from app.auth.settings import get_auth_settings
-
+def auth_settings(auth_env: str) -> AuthSettings:
     return get_auth_settings()
 
 
@@ -37,12 +23,15 @@ def client(auth_settings: AuthSettings) -> TestClient:
 
 
 @pytest.fixture
-def unconfigured_client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
+def unconfigured_client(
+    tmp_db_path: str, monkeypatch: pytest.MonkeyPatch
+) -> TestClient:
     monkeypatch.delenv("GOOGLE_CLIENT_ID", raising=False)
     monkeypatch.delenv("GOOGLE_CLIENT_SECRET", raising=False)
     monkeypatch.delenv("JWT_SECRET", raising=False)
     monkeypatch.delenv("SESSION_SECRET", raising=False)
     clear_auth_settings_cache()
+    clear_user_repository_cache()
     reset_oauth_registration()
     return TestClient(create_app())
 
@@ -64,19 +53,20 @@ def test_logout_clears_session(client: TestClient, auth_settings: AuthSettings) 
         sub="google-sub-1",
         email="resident@example.com",
         name="Resident",
+        role="learner",
     )
     client.cookies.set(auth_settings.cookie_name, token)
 
     me_before = client.get("/auth/me")
     assert me_before.status_code == 200
-    assert me_before.json()["email"] == "resident@example.com"
+    body = me_before.json()
+    assert body["email"] == "resident@example.com"
+    assert body["role"] == "learner"
 
     logout = client.post("/auth/logout")
     assert logout.status_code == 200
     assert logout.json()["status"] == "logged_out"
 
-    # Starlette TestClient keeps cookies unless we drop them after Set-Cookie delete.
-    # delete_cookie sends Max-Age=0; ensure client drops it for subsequent calls.
     client.cookies.clear()
     me_after = client.get("/auth/me")
     assert me_after.status_code == 401
@@ -112,7 +102,6 @@ def test_callback_sets_httpOnly_cookie_and_redirects(
     assert "HttpOnly" in set_cookie
     assert "samesite=lax" in set_cookie.lower()
 
-    # Session works with the issued cookie
     client.cookies.set(
         auth_settings.cookie_name,
         response.cookies[auth_settings.cookie_name],
@@ -123,10 +112,10 @@ def test_callback_sets_httpOnly_cookie_and_redirects(
     assert body["sub"] == "google-sub-42"
     assert body["email"] == "learner@example.com"
     assert body["name"] == "Learner"
+    assert body["role"] == "learner"
 
 
 def test_login_redirects_to_google_when_configured(client: TestClient) -> None:
-    # Avoid real HTTP fetch of Google OIDC metadata during authorize_redirect.
     async def fake_create_authorization_url(self, redirect_uri, **kwargs):  # noqa: ANN001
         return {
             "url": (
@@ -140,10 +129,8 @@ def test_login_redirects_to_google_when_configured(client: TestClient) -> None:
         "authlib.integrations.starlette_client.StarletteOAuth2App.create_authorization_url",
         new=fake_create_authorization_url,
     ):
-        # authorize_redirect also needs save_authorize_data into session — use real one
         response = client.get("/auth/google/login", follow_redirects=False)
 
-    # If metadata fetch still runs, Authlib may 500; accept redirect or document failure.
     assert response.status_code in {302, 307}
     location = response.headers.get("location", "")
     assert "accounts.google.com" in location

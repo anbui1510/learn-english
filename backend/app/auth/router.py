@@ -1,16 +1,20 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request, Response, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
 
+from app.auth.deps import get_current_user
 from app.auth.jwt_tokens import (
     clear_session_cookie,
     create_session_token,
-    current_user_from_request,
     set_session_cookie,
 )
 from app.auth.oauth import ensure_google_client, oauth
 from app.auth.settings import get_auth_settings
+from app.users.repository import UserRecord
+from app.users.service import bootstrap_admin_emails, get_user_repository
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -52,11 +56,18 @@ async def google_callback(request: Request) -> RedirectResponse:
             detail="Google account did not return email identity",
         )
 
-    session_jwt = create_session_token(
-        settings=settings,
-        sub=sub,
+    user = get_user_repository().upsert_google_user(
+        google_sub=sub,
         email=email,
         name=userinfo.get("name"),
+        bootstrap_admin_emails=bootstrap_admin_emails(),
+    )
+    session_jwt = create_session_token(
+        settings=settings,
+        sub=user.google_sub,
+        email=user.email,
+        name=user.name,
+        role=user.role,
     )
     response = RedirectResponse(url=settings.frontend_origin, status_code=302)
     set_session_cookie(response, settings, session_jwt)
@@ -64,13 +75,15 @@ async def google_callback(request: Request) -> RedirectResponse:
 
 
 @router.get("/me")
-async def me(request: Request) -> dict[str, str | None]:
-    settings = get_auth_settings()
-    user = current_user_from_request(request, settings)
+async def me(
+    user: Annotated[UserRecord, Depends(get_current_user)],
+) -> dict[str, str | int | None]:
     return {
-        "sub": user["sub"],
-        "email": user["email"],
-        "name": user.get("name"),
+        "id": user.id,
+        "sub": user.google_sub,
+        "email": user.email,
+        "name": user.name,
+        "role": user.role,
     }
 
 

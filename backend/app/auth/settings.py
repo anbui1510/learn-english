@@ -10,6 +10,8 @@ from dotenv import load_dotenv
 _ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 load_dotenv(_ENV_FILE)
 
+_DEFAULT_DB = Path(__file__).resolve().parents[2] / "data" / "learn_english.sqlite3"
+
 
 @dataclass(frozen=True)
 class AuthSettings:
@@ -23,6 +25,8 @@ class AuthSettings:
     cookie_secure: bool
     cookie_max_age: int
     cookie_samesite: str
+    database_path: str
+    bootstrap_admin_emails: str
 
     @property
     def oauth_configured(self) -> bool:
@@ -54,6 +58,8 @@ def get_auth_settings() -> AuthSettings:
         cookie_secure=_env("COOKIE_SECURE", "false").lower() in {"1", "true", "yes"},
         cookie_max_age=int(_env("COOKIE_MAX_AGE", "86400")),
         cookie_samesite=_env("COOKIE_SAMESITE", "lax").lower(),
+        database_path=_env("DATABASE_PATH", str(_DEFAULT_DB)),
+        bootstrap_admin_emails=_env("BOOTSTRAP_ADMIN_EMAILS"),
     )
 
 

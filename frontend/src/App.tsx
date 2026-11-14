@@ -1,10 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { AdminUsers } from './AdminUsers'
 import { fetchMe, loginUrl, logout, type AuthUser } from './api'
 
 function App() {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const handleError = useCallback((message: string | null) => {
+    setError(message)
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -49,8 +54,7 @@ function App() {
           Medical English practice
         </h1>
         <p className="max-w-prose text-slate-600">
-          Sign in with Google to continue. Roles and lessons land in later
-          stories.
+          Sign in with Google. Admins can assign editor and learner roles here.
         </p>
 
         <div className="flex flex-wrap items-center gap-3 pt-2">
@@ -61,6 +65,7 @@ function App() {
               <p className="text-sm text-slate-700">
                 Signed in as{' '}
                 <span className="font-medium">{user.email}</span>
+                <span className="text-slate-500"> ({user.role})</span>
               </p>
               <button
                 type="button"
@@ -85,6 +90,8 @@ function App() {
             {error}
           </p>
         ) : null}
+
+        {user?.role === 'admin' ? <AdminUsers onError={handleError} /> : null}
       </div>
     </main>
   )
