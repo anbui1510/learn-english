@@ -1,0 +1,5 @@
+# BMad generated planning/build artifacts
+_bmad-output/
+
+# Personal BMad config (see _bmad/custom/.gitignore)
+_bmad/custom/*.user.toml
