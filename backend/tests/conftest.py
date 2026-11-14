@@ -4,27 +4,29 @@ import pytest
 
 from app.auth.oauth import reset_oauth_registration
 from app.auth.settings import clear_auth_settings_cache
+from app.cases.service import clear_case_repository_cache
 from app.users.service import clear_user_repository_cache
+
+
+def _clear_all_caches() -> None:
+    clear_auth_settings_cache()
+    clear_user_repository_cache()
+    clear_case_repository_cache()
+    reset_oauth_registration()
 
 
 @pytest.fixture(autouse=True)
 def _reset_caches() -> None:
-    clear_auth_settings_cache()
-    clear_user_repository_cache()
-    reset_oauth_registration()
+    _clear_all_caches()
     yield
-    clear_auth_settings_cache()
-    clear_user_repository_cache()
-    reset_oauth_registration()
+    _clear_all_caches()
 
 
 @pytest.fixture
 def tmp_db_path(tmp_path, monkeypatch: pytest.MonkeyPatch) -> str:
     db_path = str(tmp_path / "test.sqlite3")
     monkeypatch.setenv("DATABASE_PATH", db_path)
-    clear_auth_settings_cache()
-    clear_user_repository_cache()
-    reset_oauth_registration()
+    _clear_all_caches()
     return db_path
 
 
@@ -42,6 +44,5 @@ def auth_env(tmp_db_path: str, monkeypatch: pytest.MonkeyPatch) -> str:
     monkeypatch.setenv("COOKIE_NAME", "le_session")
     monkeypatch.setenv("COOKIE_SECURE", "false")
     monkeypatch.setenv("BOOTSTRAP_ADMIN_EMAILS", "admin@example.com")
-    clear_auth_settings_cache()
-    clear_user_repository_cache()
+    _clear_all_caches()
     return tmp_db_path

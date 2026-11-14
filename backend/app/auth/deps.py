@@ -41,3 +41,15 @@ def require_admin(
             detail="Admin role required",
         )
     return user
+
+
+def require_editor(
+    user: Annotated[UserRecord, Depends(get_current_user)],
+) -> UserRecord:
+    """Editor-only routes: editors and admins allowed; learners get 403."""
+    if user.role not in {"editor", "admin"}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Editor role required",
+        )
+    return user

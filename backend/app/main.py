@@ -8,6 +8,8 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.admin.router import router as admin_router
 from app.auth.router import router as auth_router
 from app.auth.settings import AuthSettings, get_auth_settings
+from app.cases.service import get_case_repository
+from app.editor.router import router as editor_router
 from app.users.service import get_user_repository
 
 
@@ -18,6 +20,7 @@ def create_app(settings: AuthSettings | None = None) -> FastAPI:
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         # Ensure schema exists at startup.
         get_user_repository()
+        get_case_repository()
         yield
 
     application = FastAPI(
@@ -42,6 +45,7 @@ def create_app(settings: AuthSettings | None = None) -> FastAPI:
     )
     application.include_router(auth_router)
     application.include_router(admin_router)
+    application.include_router(editor_router)
 
     @application.get("/health")
     def health() -> dict[str, str]:

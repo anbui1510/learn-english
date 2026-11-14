@@ -1,4 +1,4 @@
-"""Validate shared clinical-fact and dialogue JSON Schema fixtures."""
+"""Validate shared clinical-fact, dialogue, and case JSON Schema fixtures."""
 
 from __future__ import annotations
 
@@ -35,6 +35,11 @@ def dialogue_validator() -> Draft7Validator:
     return _validator("dialogue.schema.json")
 
 
+@pytest.fixture(scope="module")
+def case_validator() -> Draft7Validator:
+    return _validator("case.schema.json")
+
+
 def test_valid_clinical_fact_passes(fact_validator: Draft7Validator) -> None:
     instance = _load_json(FIXTURES_DIR / "clinical-fact.valid.json")
     fact_validator.validate(instance)
@@ -59,3 +64,15 @@ def test_invalid_dialogue_empty_fact_ids_fails(
     instance = _load_json(FIXTURES_DIR / "dialogue.invalid-empty-fact-ids.json")
     with pytest.raises(ValidationError):
         dialogue_validator.validate(instance)
+
+
+def test_valid_case_passes(case_validator: Draft7Validator) -> None:
+    instance = _load_json(FIXTURES_DIR / "case.valid.json")
+    case_validator.validate(instance)
+    assert instance["owner_user_id"] >= 1
+
+
+def test_invalid_case_missing_owner_fails(case_validator: Draft7Validator) -> None:
+    instance = _load_json(FIXTURES_DIR / "case.invalid-missing-owner.json")
+    with pytest.raises(ValidationError):
+        case_validator.validate(instance)

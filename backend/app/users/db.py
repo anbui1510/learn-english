@@ -24,6 +24,18 @@ CREATE TABLE IF NOT EXISTS role_audit (
     FOREIGN KEY(user_id) REFERENCES users(id),
     FOREIGN KEY(actor_user_id) REFERENCES users(id)
 );
+
+CREATE TABLE IF NOT EXISTS cases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_user_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('draft', 'published')),
+    isbn TEXT,
+    edition TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY(owner_user_id) REFERENCES users(id)
+);
 """
 
 

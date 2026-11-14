@@ -58,6 +58,16 @@ uv run pytest
 
 Roles persist in SQLite (`DATABASE_PATH`, default `backend/data/learn_english.sqlite3`). New Google users default to `learner`. Emails in `BOOTSTRAP_ADMIN_EMAILS` become `admin` on first login.
 
+### Editor RBAC + Case ownership
+
+| Method | Path | Behavior |
+|--------|------|----------|
+| `GET` | `/editor/ping` | Editor/admin `200`; learner `403`; anonymous `401` |
+| `POST` | `/editor/cases` | Create draft Case owned by caller (`owner_user_id`) |
+| `GET` | `/editor/cases` | List cases owned by caller |
+
+**RBAC matrix:** learner → 403 on editor routes; editor and admin → allowed. Cases must be owned by an editor or admin user id (learner ownership rejected in unit tests). Shared contract: `schemas/case.schema.json`.
+
 ### Google OAuth setup (manual verify)
 
 1. Create an OAuth 2.0 **Web application** client in Google Cloud Console.
