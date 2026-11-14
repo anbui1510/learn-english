@@ -1,4 +1,44 @@
+import { useEffect, useState } from 'react'
+import { fetchMe, loginUrl, logout, type AuthUser } from './api'
+
 function App() {
+  const [user, setUser] = useState<AuthUser | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const me = await fetchMe()
+        if (!cancelled) {
+          setUser(me)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Could not load session')
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  async function onLogout() {
+    setError(null)
+    try {
+      await logout()
+      setUser(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Logout failed')
+    }
+  }
+
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
       <div className="mx-auto flex max-w-3xl flex-col gap-4 px-6 py-16">
@@ -9,9 +49,42 @@ function App() {
           Medical English practice
         </h1>
         <p className="max-w-prose text-slate-600">
-          Frontend scaffold is ready. Auth, lessons, and player screens land in
-          later stories.
+          Sign in with Google to continue. Roles and lessons land in later
+          stories.
         </p>
+
+        <div className="flex flex-wrap items-center gap-3 pt-2">
+          {loading ? (
+            <p className="text-sm text-slate-500">Checking session…</p>
+          ) : user ? (
+            <>
+              <p className="text-sm text-slate-700">
+                Signed in as{' '}
+                <span className="font-medium">{user.email}</span>
+              </p>
+              <button
+                type="button"
+                onClick={() => void onLogout()}
+                className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
+              >
+                Log out
+              </button>
+            </>
+          ) : (
+            <a
+              href={loginUrl()}
+              className="rounded-md bg-teal-700 px-3 py-2 text-sm font-medium text-white hover:bg-teal-600"
+            >
+              Sign in with Google
+            </a>
+          )}
+        </div>
+
+        {error ? (
+          <p className="text-sm text-red-700" role="alert">
+            {error}
+          </p>
+        ) : null}
       </div>
     </main>
   )

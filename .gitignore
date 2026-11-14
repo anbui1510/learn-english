@@ -4,6 +4,11 @@ _bmad-output/
 # Personal BMad config (see _bmad/custom/.gitignore)
 _bmad/custom/*.user.toml
 
+# Secrets / local env
+.env
+backend/.env
+frontend/.env
+
 # Python
 .venv/
 __pycache__/
