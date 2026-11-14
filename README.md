@@ -13,7 +13,7 @@ Medical English practice platform for residents (MVP stack from `docs/brief.md` 
 ## Prerequisites
 
 - **Python** 3.12+ and [uv](https://docs.astral.sh/uv/) (`uv` on `PATH`; often `$HOME/.local/bin`)
-- **Node.js** 20+ and npm
+- **Node.js** `^20.19.0 || >=22.12.0` (Vite 8 engines) and npm
 
 ## Backend
 
