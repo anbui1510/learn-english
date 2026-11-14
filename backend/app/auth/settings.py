@@ -4,6 +4,7 @@ import os
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from dotenv import load_dotenv
 
@@ -11,6 +12,8 @@ _ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 load_dotenv(_ENV_FILE)
 
 _DEFAULT_DB = Path(__file__).resolve().parents[2] / "data" / "learn_english.sqlite3"
+
+SameSite = Literal["lax", "strict", "none"]
 
 
 @dataclass(frozen=True)
@@ -24,7 +27,7 @@ class AuthSettings:
     cookie_name: str
     cookie_secure: bool
     cookie_max_age: int
-    cookie_samesite: str
+    cookie_samesite: SameSite
     database_path: str
     bootstrap_admin_emails: str
 
@@ -42,6 +45,15 @@ def _env(name: str, default: str = "") -> str:
     return os.getenv(name, default).strip()
 
 
+def _parse_samesite(value: str) -> SameSite:
+    normalized = value.lower()
+    if normalized == "strict":
+        return "strict"
+    if normalized == "none":
+        return "none"
+    return "lax"
+
+
 @lru_cache
 def get_auth_settings() -> AuthSettings:
     return AuthSettings(
@@ -57,7 +69,7 @@ def get_auth_settings() -> AuthSettings:
         cookie_name=_env("COOKIE_NAME", "le_session"),
         cookie_secure=_env("COOKIE_SECURE", "false").lower() in {"1", "true", "yes"},
         cookie_max_age=int(_env("COOKIE_MAX_AGE", "86400")),
-        cookie_samesite=_env("COOKIE_SAMESITE", "lax").lower(),
+        cookie_samesite=_parse_samesite(_env("COOKIE_SAMESITE", "lax")),
         database_path=_env("DATABASE_PATH", str(_DEFAULT_DB)),
         bootstrap_admin_emails=_env("BOOTSTRAP_ADMIN_EMAILS"),
     )

@@ -49,7 +49,7 @@ def set_session_cookie(response: Response, settings: AuthSettings, token: str) -
         max_age=settings.cookie_max_age,
         httponly=True,
         secure=settings.cookie_secure,
-        samesite=settings.cookie_samesite,  # type: ignore[arg-type]
+        samesite=settings.cookie_samesite,
         path="/",
     )
 
@@ -60,7 +60,7 @@ def clear_session_cookie(response: Response, settings: AuthSettings) -> None:
         path="/",
         secure=settings.cookie_secure,
         httponly=True,
-        samesite=settings.cookie_samesite,  # type: ignore[arg-type]
+        samesite=settings.cookie_samesite,
     )
 
 
@@ -89,6 +89,5 @@ def current_identity_from_request(
     }
 
 
-# Back-compat alias used by older tests / callers
 def current_user_from_request(request: Request, settings: AuthSettings) -> dict[str, Any]:
     return current_identity_from_request(request, settings)

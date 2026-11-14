@@ -7,19 +7,9 @@ from fastapi.testclient import TestClient
 
 from app.auth.jwt_tokens import create_session_token
 from app.auth.oauth import reset_oauth_registration
-from app.auth.settings import AuthSettings, clear_auth_settings_cache, get_auth_settings
+from app.auth.settings import AuthSettings, clear_auth_settings_cache
 from app.main import create_app
 from app.users.service import clear_user_repository_cache
-
-
-@pytest.fixture
-def auth_settings(auth_env: str) -> AuthSettings:
-    return get_auth_settings()
-
-
-@pytest.fixture
-def client(auth_settings: AuthSettings) -> TestClient:
-    return TestClient(create_app(auth_settings))
 
 
 @pytest.fixture

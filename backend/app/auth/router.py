@@ -9,6 +9,7 @@ from app.auth.deps import get_current_user
 from app.auth.jwt_tokens import (
     clear_session_cookie,
     create_session_token,
+    current_identity_from_request,
     set_session_cookie,
 )
 from app.auth.oauth import ensure_google_client, oauth
@@ -76,8 +77,23 @@ async def google_callback(request: Request) -> RedirectResponse:
 
 @router.get("/me")
 async def me(
+    request: Request,
+    response: Response,
     user: Annotated[UserRecord, Depends(get_current_user)],
 ) -> dict[str, str | int | None]:
+    settings = get_auth_settings()
+    identity = current_identity_from_request(request, settings)
+    # DB is source of truth; refresh cookie when JWT role claim is stale.
+    if identity.get("role") != user.role:
+        token = create_session_token(
+            settings=settings,
+            sub=user.google_sub,
+            email=user.email,
+            name=user.name,
+            role=user.role,
+        )
+        set_session_cookie(response, settings, token)
+
     return {
         "id": user.id,
         "sub": user.google_sub,
