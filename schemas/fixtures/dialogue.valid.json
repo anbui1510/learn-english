@@ -1,0 +1,19 @@
+{
+  "id": "dialogue-example-001",
+  "context": "patient_family",
+  "cefr_level": "A2",
+  "lines": [
+    {
+      "speaker": "doctor",
+      "text": "Your child has had a fever. That can happen with an infection.",
+      "text_vi": "Con bạn bị sốt. Điều này có thể xảy ra khi bị nhiễm trùng.",
+      "fact_ids": ["fact-example-001"],
+      "is_key_phrase": true
+    },
+    {
+      "speaker": "parent",
+      "text": "Should I bring them to the clinic today?",
+      "fact_ids": ["fact-example-001"]
+    }
+  ]
+}

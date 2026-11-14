@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://learn-english.local/schemas/clinical-fact.schema.json",
+  "title": "ClinicalFactCard",
+  "description": "Atomic clinical fact card with citation metadata (brief §4.2 / US-G1-021).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "source_quote",
+    "metadata",
+    "atomic_fact",
+    "category",
+    "status"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional stable id referenced by dialogue line fact_ids."
+    },
+    "source_quote": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Short verbatim or near-verbatim quote from the source PDF."
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["isbn", "edition", "page"],
+      "properties": {
+        "isbn": {
+          "type": "string",
+          "minLength": 1
+        },
+        "edition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "page": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "chapter": {
+          "type": "string",
+          "minLength": 1
+        },
+        "section": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "atomic_fact": {
+      "type": "string",
+      "minLength": 1,
+      "description": "One atomic clinical proposition (symptom, diagnosis, treatment, contraindication, etc.)."
+    },
+    "category": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Classification label for the fact type."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["needs_review", "verified"],
+      "description": "Editorial status; defaults to needs_review until verified."
+    }
+  }
+}

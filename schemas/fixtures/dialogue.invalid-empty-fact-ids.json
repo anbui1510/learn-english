@@ -1,0 +1,12 @@
+{
+  "id": "dialogue-example-invalid-001",
+  "context": "colleague_sbar",
+  "cefr_level": "B1",
+  "lines": [
+    {
+      "speaker": "nurse",
+      "text": "Situation: the patient developed a fever overnight.",
+      "fact_ids": []
+    }
+  ]
+}
