@@ -5,42 +5,13 @@ from urllib.parse import parse_qs, urlparse
 from fastapi.testclient import TestClient
 
 from app.auth.settings import AuthSettings
-from app.users.service import bootstrap_admin_emails, get_user_repository
-from tests.conftest import set_session_cookie
-
-MINIMAL_PDF = b"%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n"
-
-
-def _editor_and_learner(auth_settings: AuthSettings):
-    repo = get_user_repository()
-    admin = repo.upsert_google_user(
-        google_sub="sub-admin",
-        email="admin@example.com",
-        name="Admin",
-        bootstrap_admin_emails=bootstrap_admin_emails(),
-    )
-    editor = repo.upsert_google_user(
-        google_sub="sub-editor",
-        email="editor@example.com",
-        name="Editor",
-        bootstrap_admin_emails=bootstrap_admin_emails(),
-    )
-    editor = repo.set_role(
-        user_id=editor.id, new_role="editor", actor_user_id=admin.id
-    )
-    learner = repo.upsert_google_user(
-        google_sub="sub-learner",
-        email="learner@example.com",
-        name="Learner",
-        bootstrap_admin_emails=bootstrap_admin_emails(),
-    )
-    return editor, learner
+from tests.conftest import MINIMAL_PDF, seed_admin_editor_learner, set_session_cookie
 
 
 def test_upload_creates_case_draft_with_object(
     client: TestClient, auth_settings: AuthSettings
 ) -> None:
-    editor, learner = _editor_and_learner(auth_settings)
+    _, editor, learner = seed_admin_editor_learner(auth_settings)
     set_session_cookie(client, auth_settings, editor)
 
     response = client.post(
@@ -73,7 +44,7 @@ def test_upload_creates_case_draft_with_object(
 def test_upload_rejects_non_pdf_and_oversized(
     client: TestClient, auth_settings: AuthSettings
 ) -> None:
-    editor, _ = _editor_and_learner(auth_settings)
+    _, editor, _ = seed_admin_editor_learner(auth_settings)
     set_session_cookie(client, auth_settings, editor)
 
     bad_mime = client.post(
@@ -95,7 +66,7 @@ def test_upload_rejects_non_pdf_and_oversized(
 def test_upload_requires_isbn_and_edition(
     client: TestClient, auth_settings: AuthSettings
 ) -> None:
-    editor, _ = _editor_and_learner(auth_settings)
+    _, editor, _ = seed_admin_editor_learner(auth_settings)
     set_session_cookie(client, auth_settings, editor)
     missing = client.post(
         "/editor/cases/upload",
@@ -108,7 +79,7 @@ def test_upload_requires_isbn_and_edition(
 def test_download_url_owner_ok_learner_forbidden(
     client: TestClient, auth_settings: AuthSettings
 ) -> None:
-    editor, learner = _editor_and_learner(auth_settings)
+    _, editor, learner = seed_admin_editor_learner(auth_settings)
     set_session_cookie(client, auth_settings, editor)
     created = client.post(
         "/editor/cases/upload",

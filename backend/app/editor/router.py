@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 
 from app.auth.deps import get_current_user, require_editor
 from app.auth.settings import get_auth_settings
+from app.cases.access import PDF_MIME, can_access_case
 from app.cases.repository import CaseRecord
 from app.cases.service import get_case_repository
 from app.dialogues.generate import GenerateError, generate_for_case
@@ -35,8 +36,6 @@ from app.storage.factory import get_storage
 from app.users.repository import UserRecord
 
 router = APIRouter(prefix="/editor", tags=["editor"])
-
-PDF_MIME = "application/pdf"
 
 
 class EditorPingOut(BaseModel):
@@ -173,15 +172,11 @@ def _dialogue_out(record: DialogueRecord) -> DialogueOut:
     )
 
 
-def _can_access_case(user: UserRecord, case: CaseRecord) -> bool:
-    return user.role == "admin" or case.owner_user_id == user.id
-
-
 def _require_case_access(user: UserRecord, case_id: int) -> CaseRecord:
     case = get_case_repository().get_by_id(case_id)
     if case is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
-    if not _can_access_case(user, case):
+    if not can_access_case(user, case):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not allowed to access this case",
@@ -540,7 +535,7 @@ def stream_case_pdf(
     case = get_case_repository().get_by_id(case_id)
     if case is None or not case.pdf_object_key:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case PDF not found")
-    if not _can_access_case(user, case):
+    if not can_access_case(user, case):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not allowed to download this case PDF",

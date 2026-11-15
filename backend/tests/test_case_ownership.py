@@ -8,51 +8,24 @@ from fastapi.testclient import TestClient
 from app.auth.settings import AuthSettings
 from app.cases.ownership import CaseOwnershipError, assert_can_own_case
 from app.cases.service import get_case_repository
-from app.users.service import bootstrap_admin_emails, get_user_repository
-from tests.conftest import set_session_cookie
-
-
-def _users(auth_settings: AuthSettings):
-    repo = get_user_repository()
-    admin = repo.upsert_google_user(
-        google_sub="sub-admin",
-        email="admin@example.com",
-        name="Admin",
-        bootstrap_admin_emails=bootstrap_admin_emails(),
-    )
-    learner = repo.upsert_google_user(
-        google_sub="sub-learner",
-        email="learner@example.com",
-        name="Learner",
-        bootstrap_admin_emails=bootstrap_admin_emails(),
-    )
-    editor = repo.upsert_google_user(
-        google_sub="sub-editor",
-        email="editor@example.com",
-        name="Editor",
-        bootstrap_admin_emails=bootstrap_admin_emails(),
-    )
-    editor = repo.set_role(
-        user_id=editor.id, new_role="editor", actor_user_id=admin.id
-    )
-    return admin, editor, learner
+from tests.conftest import seed_admin_editor_learner, set_session_cookie
 
 
 def test_assert_can_own_case_rejects_learner(auth_settings: AuthSettings) -> None:
-    _, _, learner = _users(auth_settings)
+    _, _, learner = seed_admin_editor_learner(auth_settings)
     with pytest.raises(CaseOwnershipError, match="editor or admin"):
         assert_can_own_case(learner)
 
 
 def test_create_case_rejects_learner_owner(auth_settings: AuthSettings) -> None:
-    _, _, learner = _users(auth_settings)
+    _, _, learner = seed_admin_editor_learner(auth_settings)
     repo = get_case_repository()
     with pytest.raises(CaseOwnershipError):
         repo.create_case(owner=learner, title="Should fail")
 
 
 def test_reassign_to_learner_rejected(auth_settings: AuthSettings) -> None:
-    _, editor, learner = _users(auth_settings)
+    _, editor, learner = seed_admin_editor_learner(auth_settings)
     cases = get_case_repository()
     case = cases.create_case(owner=editor, title="Owned by editor")
     with pytest.raises(CaseOwnershipError):
@@ -65,7 +38,7 @@ def test_reassign_to_learner_rejected(auth_settings: AuthSettings) -> None:
 def test_editor_creates_case_via_api(
     client: TestClient, auth_settings: AuthSettings
 ) -> None:
-    _, editor, learner = _users(auth_settings)
+    _, editor, learner = seed_admin_editor_learner(auth_settings)
     set_session_cookie(client, auth_settings, editor)
     response = client.post(
         "/editor/cases",

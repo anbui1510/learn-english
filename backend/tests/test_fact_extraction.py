@@ -7,8 +7,7 @@ from jsonschema.exceptions import ValidationError
 from app.auth.settings import AuthSettings
 from app.facts.parser import HeuristicPdfParser
 from app.facts.repository import FactRepository
-from app.users.service import bootstrap_admin_emails, get_user_repository
-from tests.conftest import set_session_cookie
+from tests.conftest import seed_admin_editor_learner, set_session_cookie
 
 CLINICAL_TEXT = """
 Clinical Manifestations
@@ -27,28 +26,7 @@ FIXTURE_PDF = (
 
 
 def _editor_and_learner(auth_settings: AuthSettings):
-    repo = get_user_repository()
-    admin = repo.upsert_google_user(
-        google_sub="sub-admin",
-        email="admin@example.com",
-        name="Admin",
-        bootstrap_admin_emails=bootstrap_admin_emails(),
-    )
-    editor = repo.upsert_google_user(
-        google_sub="sub-editor",
-        email="editor@example.com",
-        name="Editor",
-        bootstrap_admin_emails=bootstrap_admin_emails(),
-    )
-    editor = repo.set_role(
-        user_id=editor.id, new_role="editor", actor_user_id=admin.id
-    )
-    learner = repo.upsert_google_user(
-        google_sub="sub-learner",
-        email="learner@example.com",
-        name="Learner",
-        bootstrap_admin_emails=bootstrap_admin_emails(),
-    )
+    _, editor, learner = seed_admin_editor_learner(auth_settings)
     return editor, learner
 
 

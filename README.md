@@ -100,7 +100,7 @@ Roles persist in SQLite (`DATABASE_PATH`, default `backend/data/learn_english.sq
 | `POST` | `/learner/completions` | Mark karaoke+shadowing complete |
 | `POST` | `/learner/attempts/audio` | Upload LearningAttempt audio (Pha 2 ready) |
 
-TTS uses Guy/Jenny voice metadata with a silent-WAV synthetic engine for CI; optional `edge-tts` adapter path reserved.
+TTS defaults to a silent-WAV synthetic engine (CI-safe). Set `USE_EDGE_TTS=true` and install optional `edge-tts` to use the async Edge adapter (falls back to synthetic on missing SDK/network errors).
 
 ### Google OAuth setup (manual verify)
 

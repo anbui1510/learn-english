@@ -38,6 +38,7 @@ class AuthSettings:
     pdf_max_bytes: int
     signed_url_ttl_seconds: int
     gemini_api_key: str
+    use_edge_tts: bool
 
     @property
     def oauth_configured(self) -> bool:
@@ -87,6 +88,7 @@ def get_auth_settings() -> AuthSettings:
         pdf_max_bytes=int(_env("PDF_MAX_BYTES", str(25 * 1024 * 1024))),
         signed_url_ttl_seconds=int(_env("SIGNED_URL_TTL_SECONDS", "300")),
         gemini_api_key=_env("GEMINI_API_KEY"),
+        use_edge_tts=_env("USE_EDGE_TTS", "false").lower() in {"1", "true", "yes"},
     )
 
 

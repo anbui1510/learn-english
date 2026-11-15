@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from app.auth.settings import get_auth_settings
 from app.dialogues.repository import DialogueRecord
 from app.speech.repository import UtteranceRecord, UtteranceRepository
 from app.speech.tts import TtsEngine, get_default_tts
@@ -14,7 +15,8 @@ def synthesize_dialogue(
     engine: TtsEngine | None = None,
 ) -> list[UtteranceRecord]:
     """Idempotent re-synth: replaces utterances for the dialogue."""
-    tts = engine or get_default_tts()
+    settings = get_auth_settings()
+    tts = engine or get_default_tts(use_edge=settings.use_edge_tts)
     lines = list(dialogue.payload.get("lines") or [])
     if not lines:
         raise ValueError("Dialogue has no lines to synthesize")
@@ -25,7 +27,8 @@ def synthesize_dialogue(
         text = str(line.get("text") or "").strip()
         speaker = str(line.get("speaker") or "doctor")
         result = tts.synthesize(text=text, speaker=speaker)
-        key = f"audio/dialogues/{dialogue.id}/line-{index:03d}.wav"
+        ext = "mp3" if "mpeg" in result.content_type else "wav"
+        key = f"audio/dialogues/{dialogue.id}/line-{index:03d}.{ext}"
         stored = storage.put(key, result.audio, content_type=result.content_type)
         stamps = [
             {

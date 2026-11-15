@@ -15,7 +15,13 @@ from app.speech.service import clear_utterance_repository_cache
 from app.storage.factory import clear_storage_cache
 from app.users.repository import UserRecord
 from app.users.roles import Role
-from app.users.service import clear_user_repository_cache
+from app.users.service import (
+    bootstrap_admin_emails,
+    clear_user_repository_cache,
+    get_user_repository,
+)
+
+MINIMAL_PDF = b"%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n"
 
 
 def _clear_all_caches() -> None:
@@ -95,3 +101,32 @@ def set_session_cookie(
         role=role_override if role_override is not None else user.role,
     )
     client.cookies.set(settings.cookie_name, token)
+
+
+def seed_admin_editor_learner(
+    _auth_settings: AuthSettings,
+) -> tuple[UserRecord, UserRecord, UserRecord]:
+    """Create bootstrap admin, an editor, and a learner for integration tests."""
+    repo = get_user_repository()
+    admin = repo.upsert_google_user(
+        google_sub="sub-admin",
+        email="admin@example.com",
+        name="Admin",
+        bootstrap_admin_emails=bootstrap_admin_emails(),
+    )
+    learner = repo.upsert_google_user(
+        google_sub="sub-learner",
+        email="learner@example.com",
+        name="Learner",
+        bootstrap_admin_emails=bootstrap_admin_emails(),
+    )
+    editor = repo.upsert_google_user(
+        google_sub="sub-editor",
+        email="editor@example.com",
+        name="Editor",
+        bootstrap_admin_emails=bootstrap_admin_emails(),
+    )
+    editor = repo.set_role(
+        user_id=editor.id, new_role="editor", actor_user_id=admin.id
+    )
+    return admin, editor, learner

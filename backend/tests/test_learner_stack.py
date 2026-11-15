@@ -4,35 +4,13 @@ from fastapi.testclient import TestClient
 
 from app.auth.settings import AuthSettings
 from app.learner.shadowing import build_shadowing_cards
-from app.speech.tts import SyntheticTtsEngine, voice_for_speaker
-from app.users.service import bootstrap_admin_emails, get_user_repository
-from tests.conftest import set_session_cookie
+from app.speech.tts import EdgeTtsEngine, SyntheticTtsEngine, voice_for_speaker
+from tests.conftest import seed_admin_editor_learner, set_session_cookie
 from tests.test_fact_extraction import FIXTURE_PDF
 
 
 def _users(auth_settings: AuthSettings):
-    repo = get_user_repository()
-    admin = repo.upsert_google_user(
-        google_sub="sub-admin",
-        email="admin@example.com",
-        name="Admin",
-        bootstrap_admin_emails=bootstrap_admin_emails(),
-    )
-    editor = repo.upsert_google_user(
-        google_sub="sub-editor",
-        email="editor@example.com",
-        name="Editor",
-        bootstrap_admin_emails=bootstrap_admin_emails(),
-    )
-    editor = repo.set_role(
-        user_id=editor.id, new_role="editor", actor_user_id=admin.id
-    )
-    learner = repo.upsert_google_user(
-        google_sub="sub-learner",
-        email="learner@example.com",
-        name="Learner",
-        bootstrap_admin_emails=bootstrap_admin_emails(),
-    )
+    _, editor, learner = seed_admin_editor_learner(auth_settings)
     return editor, learner
 
 
@@ -74,6 +52,23 @@ def _published_with_dialogue(
     assert dialogues.status_code == 200, dialogues.text
     dialogue_id = dialogues.json()[0]["id"]
     return case_id, dialogue_id
+
+
+def test_edge_tts_falls_back_without_sdk(monkeypatch) -> None:
+    import builtins
+
+    real_import = builtins.__import__
+
+    def _block_edge(name, *args, **kwargs):
+        if name == "edge_tts" or name.startswith("edge_tts."):
+            raise ImportError("blocked for test")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", _block_edge)
+    result = EdgeTtsEngine().synthesize(text="hello world", speaker="doctor")
+    assert result.content_type == "audio/wav"
+    assert result.duration_ms > 0
+    assert len(result.words) >= 2
 
 
 def test_tts_and_shadowing_helpers() -> None:

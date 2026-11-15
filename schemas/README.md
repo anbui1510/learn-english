@@ -9,7 +9,7 @@ Downstream extraction, ingest, and dialogue epics should import these files rath
 |----------|------|--------|
 | Clinical fact card | `schemas/clinical-fact.schema.json` | `source_quote`, `metadata` (ISBN, edition, page, optional chapter/section), `atomic_fact`, `category`, `status` ∈ `needs_review` \| `verified`, optional `id` |
 | Dialogue artifact | `schemas/dialogue.schema.json` | `context` ∈ `patient_family` \| `colleague_sbar` \| `expert_cme`, `cefr_level` ∈ `A2` \| `B1` \| `C1`, `lines[]` each with non-empty `fact_ids` |
-| Case | `schemas/case.schema.json` | `owner_user_id` (editor/admin user id), `title`, `status` ∈ `draft` \| `published`, optional ISBN/edition |
+| Case | `schemas/case.schema.json` | `owner_user_id` (editor/admin user id), `title`, `status` ∈ `draft` \| `published`, optional ISBN/edition, optional `pdf_object_key` / `pdf_content_type` / `pdf_byte_size` |
 
 ## Fixtures
 
