@@ -93,6 +93,25 @@ def test_heuristic_parser_extracts_headed_segments() -> None:
     assert all(s.page >= 1 for s in segments)
 
 
+def test_heuristic_parser_accepts_all_caps_nelson_headings() -> None:
+    """Nelson chapter PDFs often print CLINICAL MANIFESTATIONS in caps."""
+    caps_text = """
+CLINICAL MANIFESTATIONS
+A child with an ostium secundum ASD is often asymptomatic.
+DIAGNOSIS
+The electrocardiogram shows RV volume overload.
+TREATMENT
+Surgical or catheter closure may be indicated for larger defects.
+""".strip()
+    fixture = b"%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n" + caps_text.encode(
+        "latin-1"
+    )
+    segments = HeuristicPdfParser().parse(fixture)
+    categories = {s.category for s in segments}
+    assert categories == {"Clinical Manifestations", "Diagnosis", "Treatment"}
+    assert all(s.source_quote for s in segments)
+
+
 def test_extract_job_produces_needs_review_facts(
     client: TestClient, auth_settings: AuthSettings
 ) -> None:

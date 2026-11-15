@@ -347,7 +347,15 @@ export function EditorFacts({ onError, focusCaseId = null }: Props) {
               {selected.status === 'published' && selected.published_at
                 ? ` · published ${selected.published_at}`
                 : ''}
+              {selected.extract_status === 'succeeded' && facts.length === 0
+                ? ' · 0 facts matched (try Start extract again after a parser update, or use a chapter with Clinical Manifestations / Diagnosis / Treatment headings)'
+                : ''}
             </p>
+            {selected.status !== 'published' ? (
+              <p className="text-sm text-amber-800">
+                Next: verify facts below → Publish case → then Generate dialogues unlocks.
+              </p>
+            ) : null}
             <div className="grid gap-2 rounded border border-slate-200 p-3 text-sm sm:grid-cols-2">
               <label>
                 Module slug
