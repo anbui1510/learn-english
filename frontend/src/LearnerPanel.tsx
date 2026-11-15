@@ -516,6 +516,30 @@ export function LearnerPanel({ onError }: Props) {
               </label>
             </div>
 
+            {lesson.session_kind === 'presentation' ? (
+              <div className="mt-3">
+                <p className="text-xs text-slate-500">
+                  ~10 min presentation · line {lineIndex + 1}/
+                  {lesson.playlist.length}
+                  {lesson.estimated_seconds
+                    ? ` · ~${Math.round(lesson.estimated_seconds / 60)} min script`
+                    : ''}
+                </p>
+                <div className="mt-1 h-1.5 w-full overflow-hidden rounded bg-slate-200">
+                  <div
+                    className="h-full bg-teal-600 transition-[width] duration-300"
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        ((lineIndex + 1) / Math.max(lesson.playlist.length, 1)) *
+                          100,
+                      )}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            ) : null}
+
             {current ? (
               <div className="mt-4">
                 <p className={`font-medium ${speakerColor}`}>{current.speaker}</p>

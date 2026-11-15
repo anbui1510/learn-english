@@ -269,12 +269,16 @@ export type DialogueArtifact = {
   created_at: string
 }
 
+export type SessionKind = 'standard' | 'presentation'
+
 export async function generateDialogues(
   caseId: number,
   input: {
     contexts: DialogueContext[]
     cefr_level: CefrLevel
     include_vi?: boolean
+    session_kind?: SessionKind
+    target_seconds?: number
   },
 ): Promise<DialogueArtifact[]> {
   const response = await fetch(
@@ -375,6 +379,9 @@ export type Lesson = {
   edition: string | null
   citation_pages: number[]
   playlist: PlaylistItem[]
+  session_kind?: SessionKind
+  target_seconds?: number | null
+  estimated_seconds?: number
 }
 
 export type ShadowingCard = {

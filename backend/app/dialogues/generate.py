@@ -3,7 +3,12 @@ from __future__ import annotations
 from typing import Any
 
 from app.cases.repository import CaseRecord
-from app.dialogues.duration import duration_warning, estimate_seconds
+from app.dialogues.duration import (
+    PRESENTATION_TARGET_SECONDS,
+    SessionKind,
+    estimate_seconds,
+    session_duration_warning,
+)
 from app.dialogues.generator import (
     CONTEXTS,
     CefrLevel,
@@ -29,6 +34,8 @@ def generate_for_case(
     dialogues: DialogueRepository,
     generator: DialogueGenerator | None = None,
     replace_existing: bool = True,
+    session_kind: SessionKind = "standard",
+    target_seconds: float | None = None,
 ) -> list[DialogueRecord]:
     if case.status != "published":
         raise GenerateError("Case must be published before generate-dialogues")
@@ -46,6 +53,10 @@ def generate_for_case(
     if replace_existing:
         dialogues.delete_for_case(case.id)
 
+    goal = target_seconds
+    if session_kind == "presentation" and goal is None:
+        goal = PRESENTATION_TARGET_SECONDS
+
     created: list[DialogueRecord] = []
     for context in contexts:
         payload: dict[str, Any] = active.generate(
@@ -53,6 +64,8 @@ def generate_for_case(
             context=context,
             cefr_level=cefr_level,
             include_vi=include_vi,
+            session_kind=session_kind,
+            target_seconds=goal,
         )
         # Ensure fact_ids only reference verified facts for this case
         verified_ids = {str(f.id) for f in verified}
@@ -61,7 +74,7 @@ def generate_for_case(
             if not ids or any(fid not in verified_ids for fid in ids):
                 raise GenerateError("Dialogue line fact_ids must cite verified facts")
         seconds = estimate_seconds(payload["lines"])
-        warn = duration_warning(seconds)
+        warn = session_duration_warning(seconds, session_kind=session_kind)
         created.append(
             dialogues.insert_dialogue(
                 case_id=case.id,

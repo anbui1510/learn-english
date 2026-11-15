@@ -89,6 +89,9 @@ class LessonOut(BaseModel):
     citation_pages: list[int]
     lines: list[dict[str, Any]]
     playlist: list[PlaylistItemOut]
+    session_kind: Literal["standard", "presentation"] = "standard"
+    target_seconds: float | None = None
+    estimated_seconds: float = 0.0
 
 
 class ShadowingOut(BaseModel):
@@ -478,6 +481,11 @@ def get_lesson(
                 fact_ids=list(line.get("fact_ids") or []),
             )
         )
+    raw_kind = str(dialogue.payload.get("session_kind") or "standard")
+    session_kind: Literal["standard", "presentation"] = (
+        "presentation" if raw_kind == "presentation" else "standard"
+    )
+    target = dialogue.payload.get("target_seconds")
     return LessonOut(
         case_id=case.id,
         dialogue_id=dialogue.id,
@@ -489,6 +497,9 @@ def get_lesson(
         citation_pages=sorted(set(pages)),
         lines=lines,
         playlist=playlist,
+        session_kind=session_kind,
+        target_seconds=float(target) if target is not None else None,
+        estimated_seconds=float(dialogue.estimated_seconds),
     )
 
 

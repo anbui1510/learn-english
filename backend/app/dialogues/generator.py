@@ -2,6 +2,11 @@ from __future__ import annotations
 
 from typing import Any, Literal, Protocol
 
+from app.dialogues.duration import (
+    PRESENTATION_TARGET_SECONDS,
+    SessionKind,
+    estimate_seconds,
+)
 from app.facts.repository import FactRecord
 
 DialogueContext = Literal["patient_family", "colleague_sbar", "expert_cme"]
@@ -13,6 +18,15 @@ CONTEXTS: tuple[DialogueContext, ...] = (
     "expert_cme",
 )
 
+_PRESENTATION_FRAMES = (
+    "Opening: today we review this teaching point carefully. {body}",
+    "Clinical emphasis: {body}",
+    "Key takeaway for the team: {body}",
+    "In practice, remember: {body}",
+    "Pause and reflect with colleagues: {body}",
+    "Summary slide: {body}",
+)
+
 
 class DialogueGenerator(Protocol):
     def generate(
@@ -22,6 +36,8 @@ class DialogueGenerator(Protocol):
         context: DialogueContext,
         cefr_level: CefrLevel,
         include_vi: bool,
+        session_kind: SessionKind = "standard",
+        target_seconds: float | None = None,
     ) -> dict[str, Any]: ...
 
 
@@ -52,23 +68,35 @@ class TemplateDialogueGenerator:
         context: DialogueContext,
         cefr_level: CefrLevel,
         include_vi: bool,
+        session_kind: SessionKind = "standard",
+        target_seconds: float | None = None,
     ) -> dict[str, Any]:
         if not facts:
             raise ValueError("At least one verified fact is required")
 
-        lines: list[dict[str, Any]] = []
-        if context == "patient_family":
-            lines.extend(self._patient_family(facts, cefr_level, include_vi))
+        if session_kind == "presentation":
+            goal = float(target_seconds or PRESENTATION_TARGET_SECONDS)
+            lines = self._presentation_lines(
+                facts, context, cefr_level, include_vi, goal
+            )
+        elif context == "patient_family":
+            lines = self._patient_family(facts, cefr_level, include_vi)
         elif context == "colleague_sbar":
-            lines.extend(self._colleague_sbar(facts, cefr_level, include_vi))
+            lines = self._colleague_sbar(facts, cefr_level, include_vi)
         else:
-            lines.extend(self._expert_cme(facts, cefr_level, include_vi))
+            lines = self._expert_cme(facts, cefr_level, include_vi)
 
-        return {
+        payload: dict[str, Any] = {
             "context": context,
             "cefr_level": cefr_level,
+            "session_kind": session_kind,
             "lines": lines,
         }
+        if session_kind == "presentation":
+            payload["target_seconds"] = float(
+                target_seconds or PRESENTATION_TARGET_SECONDS
+            )
+        return payload
 
     def _line(
         self,
@@ -89,6 +117,44 @@ class TemplateDialogueGenerator:
         if is_key_phrase:
             line["is_key_phrase"] = True
         return line
+
+    def _presentation_lines(
+        self,
+        facts: list[FactRecord],
+        context: DialogueContext,
+        cefr_level: CefrLevel,
+        include_vi: bool,
+        target_seconds: float,
+    ) -> list[dict[str, Any]]:
+        """Expand fact-bound teaching frames until estimated duration hits target."""
+        lines: list[dict[str, Any]] = []
+        cycle = 0
+        # Cap cycles so CI never hangs if WPM math changes.
+        while estimate_seconds(lines) < target_seconds * 0.9 and cycle < 80:
+            for index, fact in enumerate(facts):
+                body = _cefr_wrap(fact.atomic_fact, cefr_level)
+                frame = _PRESENTATION_FRAMES[cycle % len(_PRESENTATION_FRAMES)]
+                text = frame.format(body=body)
+                if context == "colleague_sbar":
+                    text = f"SBAR teaching: {text}"
+                elif context == "patient_family":
+                    text = f"Family education: {text}"
+                else:
+                    text = f"CME presentation: {text}"
+                speaker = "presenter" if index % 2 == 0 else "colleague"
+                lines.append(
+                    self._line(
+                        speaker=speaker,
+                        text=text,
+                        fact=fact,
+                        include_vi=include_vi,
+                        is_key_phrase=cycle == 0 and index == 0,
+                    )
+                )
+                if estimate_seconds(lines) >= target_seconds * 0.9:
+                    break
+            cycle += 1
+        return lines
 
     def _patient_family(
         self,
@@ -169,16 +235,18 @@ class GeminiDialogueGenerator:
         context: DialogueContext,
         cefr_level: CefrLevel,
         include_vi: bool,
+        session_kind: SessionKind = "standard",
+        target_seconds: float | None = None,
     ) -> dict[str, Any]:
         if not self.api_key:
             raise RuntimeError("GEMINI_API_KEY is not configured")
-        # Gemini structured-output wiring reserved for when the key + SDK are present.
-        # Fall back path for MVP: use template so production never invents facts.
         return TemplateDialogueGenerator().generate(
             facts=facts,
             context=context,
             cefr_level=cefr_level,
             include_vi=include_vi,
+            session_kind=session_kind,
+            target_seconds=target_seconds,
         )
 
 

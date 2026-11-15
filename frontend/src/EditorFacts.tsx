@@ -52,6 +52,9 @@ export function EditorFacts({ onError }: Props) {
   ])
   const [cefrLevel, setCefrLevel] = useState<CefrLevel>('B1')
   const [includeVi, setIncludeVi] = useState(false)
+  const [sessionKind, setSessionKind] = useState<'standard' | 'presentation'>(
+    'standard',
+  )
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<string | null>(null)
   const [moduleSlug, setModuleSlug] = useState('')
@@ -244,15 +247,18 @@ export function EditorFacts({ onError }: Props) {
         contexts,
         cefr_level: cefrLevel,
         include_vi: includeVi,
+        session_kind: sessionKind,
       })
       for (const dialogue of created) {
         await synthesizeDialogue(selectedId, dialogue.id)
       }
       const warned = created.filter((d) => d.duration_warning).length
+      const kindLabel =
+        sessionKind === 'presentation' ? '~10 min presentation' : '~2 min'
       setNote(
         warned > 0
-          ? `Generated + synthesized ${created.length} dialogue(s); ${warned} exceed ~2 min.`
-          : `Generated + synthesized ${created.length} dialogue(s).`,
+          ? `Generated + synthesized ${created.length} ${kindLabel} dialogue(s); ${warned} outside target band.`
+          : `Generated + synthesized ${created.length} ${kindLabel} dialogue(s).`,
       )
       await refreshDialogues(selectedId)
     } catch (err) {
@@ -421,6 +427,23 @@ export function EditorFacts({ onError }: Props) {
                   onChange={(e) => setIncludeVi(e.target.checked)}
                 />
                 Include Vietnamese gloss
+              </label>
+              <label>
+                Session length
+                <select
+                  className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+                  value={sessionKind}
+                  onChange={(e) =>
+                    setSessionKind(
+                      e.target.value as 'standard' | 'presentation',
+                    )
+                  }
+                >
+                  <option value="standard">Standard (~2 min)</option>
+                  <option value="presentation">
+                    Presentation / CME (~10 min)
+                  </option>
+                </select>
               </label>
               <button
                 type="button"

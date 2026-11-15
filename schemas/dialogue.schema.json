@@ -22,6 +22,16 @@
       "enum": ["A2", "B1", "C1"],
       "description": "One of the three CEFR learning packages."
     },
+    "session_kind": {
+      "type": "string",
+      "enum": ["standard", "presentation"],
+      "description": "standard (~2 min) or presentation (~10 min CME talk)."
+    },
+    "target_seconds": {
+      "type": "number",
+      "minimum": 1,
+      "description": "Target spoken duration for presentation sessions."
+    },
     "lines": {
       "type": "array",
       "minItems": 1,

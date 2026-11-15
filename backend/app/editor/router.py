@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import (
     APIRouter,
@@ -94,6 +94,8 @@ class GenerateDialoguesIn(BaseModel):
     contexts: list[DialogueContext] = Field(min_length=1, max_length=3)
     cefr_level: CefrLevel = "B1"
     include_vi: bool = False
+    session_kind: Literal["standard", "presentation"] = "standard"
+    target_seconds: float | None = Field(default=None, ge=60, le=1200)
 
 
 class DialogueOut(BaseModel):
@@ -498,6 +500,8 @@ def generate_dialogues(
             facts=get_fact_repository(),
             dialogues=get_dialogue_repository(),
             generator=get_default_generator(settings.gemini_api_key),
+            session_kind=body.session_kind,
+            target_seconds=body.target_seconds,
         )
     except GenerateError as exc:
         raise HTTPException(

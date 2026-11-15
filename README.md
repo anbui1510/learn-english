@@ -119,6 +119,8 @@ TTS defaults to a silent-WAV synthetic engine (CI-safe). Set `USE_EDGE_TTS=true`
 
 **Pha 2 empathy coaching + cert share:** free-speech empathy below threshold returns `coaching_tip` + `sample_phrase` (play via `POST /learner/empathy/sample-audio`). Certificates expose a public `?cert=` share view and copy-link control.
 
+**Pha 3 presentation sessions:** editors can generate `session_kind=presentation` (~10 min CME talk) with fact-bound expanded lines + per-line TTS chunking; learners see a progress bar on long playlists.
+
 ### Google OAuth setup (manual verify)
 
 1. Create an OAuth 2.0 **Web application** client in Google Cloud Console.
