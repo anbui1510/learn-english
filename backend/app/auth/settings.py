@@ -39,6 +39,10 @@ class AuthSettings:
     signed_url_ttl_seconds: int
     gemini_api_key: str
     use_edge_tts: bool
+    azure_speech_key: str
+    azure_speech_region: str
+    use_azure_pa: bool
+    pa_daily_limit: int
 
     @property
     def oauth_configured(self) -> bool:
@@ -89,6 +93,10 @@ def get_auth_settings() -> AuthSettings:
         signed_url_ttl_seconds=int(_env("SIGNED_URL_TTL_SECONDS", "300")),
         gemini_api_key=_env("GEMINI_API_KEY"),
         use_edge_tts=_env("USE_EDGE_TTS", "false").lower() in {"1", "true", "yes"},
+        azure_speech_key=_env("AZURE_SPEECH_KEY"),
+        azure_speech_region=_env("AZURE_SPEECH_REGION", "eastasia"),
+        use_azure_pa=_env("USE_AZURE_PA", "false").lower() in {"1", "true", "yes"},
+        pa_daily_limit=int(_env("PA_DAILY_LIMIT", "50")),
     )
 
 

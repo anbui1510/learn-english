@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Literal
+from typing import Any, Literal
 
 from app.users.db import connect, init_db
 
@@ -20,10 +21,42 @@ class LearningAttempt:
     audio_object_key: str
     audio_content_type: str
     created_at: str
+    line_index: int | None = None
+    reference_text: str | None = None
+    score_json: dict[str, Any] | None = None
+    scored_at: str | None = None
 
 
 def _now() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def _parse_score(raw: str | None) -> dict[str, Any] | None:
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _row_to_attempt(row: sqlite3.Row) -> LearningAttempt:
+    keys = row.keys()
+    return LearningAttempt(
+        id=row["id"],
+        user_id=row["user_id"],
+        case_id=row["case_id"],
+        dialogue_id=row["dialogue_id"],
+        mode=row["mode"],
+        audio_object_key=row["audio_object_key"],
+        audio_content_type=row["audio_content_type"],
+        created_at=row["created_at"],
+        line_index=row["line_index"] if "line_index" in keys else None,
+        reference_text=row["reference_text"] if "reference_text" in keys else None,
+        score_json=_parse_score(row["score_json"] if "score_json" in keys else None),
+        scored_at=row["scored_at"] if "scored_at" in keys else None,
+    )
 
 
 class LearningAttemptRepository:
@@ -44,6 +77,8 @@ class LearningAttemptRepository:
         mode: AttemptMode,
         audio_object_key: str,
         audio_content_type: str,
+        line_index: int | None = None,
+        reference_text: str | None = None,
     ) -> LearningAttempt:
         now = _now()
         with self._conn() as conn:
@@ -51,8 +86,9 @@ class LearningAttemptRepository:
                 """
                 INSERT INTO learning_attempts (
                     user_id, case_id, dialogue_id, mode,
-                    audio_object_key, audio_content_type, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    audio_object_key, audio_content_type, created_at,
+                    line_index, reference_text
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     user_id,
@@ -62,6 +98,8 @@ class LearningAttemptRepository:
                     audio_object_key,
                     audio_content_type,
                     now,
+                    line_index,
+                    reference_text,
                 ),
             )
             attempt_id = int(cur.lastrowid)
@@ -70,16 +108,48 @@ class LearningAttemptRepository:
                 "SELECT * FROM learning_attempts WHERE id = ?", (attempt_id,)
             ).fetchone()
             assert row is not None
-            return LearningAttempt(
-                id=row["id"],
-                user_id=row["user_id"],
-                case_id=row["case_id"],
-                dialogue_id=row["dialogue_id"],
-                mode=row["mode"],
-                audio_object_key=row["audio_object_key"],
-                audio_content_type=row["audio_content_type"],
-                created_at=row["created_at"],
+            return _row_to_attempt(row)
+
+    def get_by_id(self, attempt_id: int) -> LearningAttempt | None:
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM learning_attempts WHERE id = ?", (attempt_id,)
+            ).fetchone()
+            return _row_to_attempt(row) if row else None
+
+    def save_score(
+        self,
+        *,
+        attempt_id: int,
+        score: dict[str, Any],
+        line_index: int | None = None,
+        reference_text: str | None = None,
+    ) -> LearningAttempt:
+        now = _now()
+        with self._conn() as conn:
+            conn.execute(
+                """
+                UPDATE learning_attempts
+                SET score_json = ?,
+                    scored_at = ?,
+                    line_index = COALESCE(?, line_index),
+                    reference_text = COALESCE(?, reference_text)
+                WHERE id = ?
+                """,
+                (
+                    json.dumps(score),
+                    now,
+                    line_index,
+                    reference_text,
+                    attempt_id,
+                ),
             )
+            conn.commit()
+            row = conn.execute(
+                "SELECT * FROM learning_attempts WHERE id = ?", (attempt_id,)
+            ).fetchone()
+            assert row is not None
+            return _row_to_attempt(row)
 
     def list_for_user(self, user_id: int) -> list[LearningAttempt]:
         with self._conn() as conn:
@@ -91,16 +161,4 @@ class LearningAttemptRepository:
                 """,
                 (user_id,),
             ).fetchall()
-            return [
-                LearningAttempt(
-                    id=row["id"],
-                    user_id=row["user_id"],
-                    case_id=row["case_id"],
-                    dialogue_id=row["dialogue_id"],
-                    mode=row["mode"],
-                    audio_object_key=row["audio_object_key"],
-                    audio_content_type=row["audio_content_type"],
-                    created_at=row["created_at"],
-                )
-                for row in rows
-            ]
+            return [_row_to_attempt(row) for row in rows]

@@ -138,11 +138,30 @@ CREATE TABLE IF NOT EXISTS learning_attempts (
     audio_object_key TEXT NOT NULL,
     audio_content_type TEXT NOT NULL,
     created_at TEXT NOT NULL,
+    line_index INTEGER,
+    reference_text TEXT,
+    score_json TEXT,
+    scored_at TEXT,
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY(case_id) REFERENCES cases(id) ON DELETE CASCADE,
     FOREIGN KEY(dialogue_id) REFERENCES dialogues(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS pa_score_usage (
+    user_id INTEGER NOT NULL,
+    usage_day TEXT NOT NULL,
+    score_count INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, usage_day),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
 """
+
+_ATTEMPT_COLUMNS: dict[str, str] = {
+    "line_index": "INTEGER",
+    "reference_text": "TEXT",
+    "score_json": "TEXT",
+    "scored_at": "TEXT",
+}
 
 _CASE_COLUMNS: dict[str, str] = {
     "pdf_object_key": "TEXT",
@@ -218,5 +237,11 @@ def init_db(conn: sqlite3.Connection) -> None:
     for name, col_type in _CASE_COLUMNS.items():
         if name not in existing:
             conn.execute(f"ALTER TABLE cases ADD COLUMN {name} {col_type}")
+    attempt_cols = {
+        row[1] for row in conn.execute("PRAGMA table_info(learning_attempts)").fetchall()
+    }
+    for name, col_type in _ATTEMPT_COLUMNS.items():
+        if name not in attempt_cols:
+            conn.execute(f"ALTER TABLE learning_attempts ADD COLUMN {name} {col_type}")
     _migrate_facts_status_rejected(conn)
     conn.commit()

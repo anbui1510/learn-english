@@ -444,14 +444,39 @@ export async function completeLesson(dialogueId: number): Promise<void> {
   }
 }
 
+export type WordBand = 'green' | 'yellow' | 'red'
+
+export type AttemptScore = {
+  engine: string
+  pronunciation: number
+  completeness: number
+  prosody: number
+  words: { word: string; accuracy: number; band: WordBand }[]
+  stress_hint?: string | null
+}
+
+export type AttemptResult = {
+  id: number
+  case_id: number
+  dialogue_id: number
+  mode: string
+  score?: AttemptScore | null
+  scored_at?: string | null
+  pa_usage?: { used: number; limit: number } | null
+}
+
 export async function uploadAttemptAudio(input: {
   dialogueId: number
   mode: 'shadowing' | 'role_play'
   file: Blob
-}): Promise<void> {
+  lineIndex?: number
+  score?: boolean
+}): Promise<AttemptResult> {
   const body = new FormData()
   body.set('dialogue_id', String(input.dialogueId))
   body.set('mode', input.mode)
+  body.set('line_index', String(input.lineIndex ?? 0))
+  body.set('score', input.score === false ? 'false' : 'true')
   body.set('file', input.file, 'attempt.webm')
   const response = await fetch(`${API_BASE}/learner/attempts/audio`, {
     method: 'POST',
@@ -461,4 +486,5 @@ export async function uploadAttemptAudio(input: {
   if (!response.ok) {
     throw new Error(`Attempt upload failed (${response.status})`)
   }
+  return (await response.json()) as AttemptResult
 }

@@ -8,6 +8,7 @@ import {
   listPublishedCases,
   patchLearnerProfile,
   uploadAttemptAudio,
+  type AttemptScore,
   type CefrLevel,
   type Lesson,
   type PublishedCase,
@@ -41,6 +42,7 @@ export function LearnerPanel({ onError }: Props) {
   const [cardIndex, setCardIndex] = useState(0)
   const [recording, setRecording] = useState(false)
   const [uploadingAttempt, setUploadingAttempt] = useState(false)
+  const [lastScore, setLastScore] = useState<AttemptScore | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const mediaChunksRef = useRef<Blob[]>([])
@@ -241,13 +243,19 @@ export function LearnerPanel({ onError }: Props) {
           }
           setUploadingAttempt(true)
           try {
-            await uploadAttemptAudio({
+            const result = await uploadAttemptAudio({
               dialogueId,
               mode: 'role_play',
               file: blob,
+              lineIndex,
+              score: true,
             })
+            setLastScore(result.score ?? null)
+            const pa = result.score
             setNote(
-              'Attempt audio saved. Pha 2 pronunciation scoring is not enabled yet.',
+              pa
+                ? `PA ${pa.engine}: pronunciation ${pa.pronunciation} · completeness ${pa.completeness} · prosody ${pa.prosody}`
+                : 'Attempt audio saved without score',
             )
           } catch (err) {
             onError(err instanceof Error ? err.message : 'Upload failed')
@@ -460,7 +468,7 @@ export function LearnerPanel({ onError }: Props) {
               <div className="border-l-2 border-orange-500 pl-3 text-sm">
                 <p className="font-medium">Your mic</p>
                 <p className="mt-1 text-slate-500">
-                  Hold a turn against the script. Scoring arrives in Pha 2.
+                  Read the script, then record. Word colors: green / yellow / red.
                 </p>
                 <button
                   type="button"
@@ -469,11 +477,38 @@ export function LearnerPanel({ onError }: Props) {
                   onClick={() => void onToggleMicRecord()}
                 >
                   {recording
-                    ? 'Stop & upload'
+                    ? 'Stop & score'
                     : uploadingAttempt
-                      ? 'Uploading…'
+                      ? 'Scoring…'
                       : 'Record attempt'}
                 </button>
+                {lastScore ? (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-xs text-slate-500">
+                      Engine: {lastScore.engine}
+                      {lastScore.stress_hint
+                        ? ` · ${lastScore.stress_hint}`
+                        : ''}
+                    </p>
+                    <p className="flex flex-wrap gap-x-1 gap-y-1 text-sm leading-relaxed">
+                      {lastScore.words.map((word, index) => (
+                        <span
+                          key={`${word.word}-${index}`}
+                          className={
+                            word.band === 'green'
+                              ? 'text-emerald-700'
+                              : word.band === 'yellow'
+                                ? 'text-amber-600'
+                                : 'text-red-600'
+                          }
+                          title={`${word.accuracy}`}
+                        >
+                          {word.word}
+                        </span>
+                      ))}
+                    </p>
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>

@@ -12,9 +12,12 @@ from app.cases.service import get_case_repository
 from app.dialogues.service import get_dialogue_repository
 from app.facts.service import get_fact_repository
 from app.learner.profiles import CefrPackage
+from app.learner.pronunciation import result_to_dict
 from app.learner.service import (
     get_learner_profile_repository,
     get_learning_attempt_repository,
+    get_pa_rate_limiter,
+    get_pronunciation_engine,
 )
 from app.learner.shadowing import build_shadowing_cards
 from app.speech.service import get_utterance_repository
@@ -87,6 +90,21 @@ class CompletionOut(BaseModel):
     completed_at: str
 
 
+class WordScoreOut(BaseModel):
+    word: str
+    accuracy: float
+    band: Literal["green", "yellow", "red"]
+
+
+class ScoreOut(BaseModel):
+    engine: str
+    pronunciation: float
+    completeness: float
+    prosody: float
+    words: list[WordScoreOut]
+    stress_hint: str | None = None
+
+
 class AttemptOut(BaseModel):
     id: int
     case_id: int
@@ -94,6 +112,67 @@ class AttemptOut(BaseModel):
     mode: str
     audio_object_key: str
     created_at: str
+    line_index: int | None = None
+    reference_text: str | None = None
+    score: ScoreOut | None = None
+    scored_at: str | None = None
+    pa_usage: dict[str, int] | None = None
+
+
+class ScoreAttemptIn(BaseModel):
+    line_index: int = Field(default=0, ge=0)
+
+
+def _attempt_out(
+    attempt,
+    *,
+    pa_usage: dict[str, int] | None = None,
+) -> AttemptOut:
+    score = None
+    if attempt.score_json:
+        score = ScoreOut.model_validate(attempt.score_json)
+    return AttemptOut(
+        id=attempt.id,
+        case_id=attempt.case_id,
+        dialogue_id=attempt.dialogue_id,
+        mode=attempt.mode,
+        audio_object_key=attempt.audio_object_key,
+        created_at=attempt.created_at,
+        line_index=attempt.line_index,
+        reference_text=attempt.reference_text,
+        score=score,
+        scored_at=attempt.scored_at,
+        pa_usage=pa_usage,
+    )
+
+
+def _line_reference(dialogue, line_index: int) -> tuple[str, list[int] | None]:
+    lines = list(dialogue.payload.get("lines") or [])
+    if not lines:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Dialogue has no lines to score against",
+        )
+    if line_index < 0 or line_index >= len(lines):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="line_index out of range",
+        )
+    line = lines[line_index]
+    text = str(line.get("text") or "").strip()
+    if not text:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Reference line text is empty",
+        )
+    raw_stress = line.get("stress_pattern")
+    stress: list[int] | None = None
+    if isinstance(raw_stress, list) and raw_stress:
+        try:
+            stress = [int(x) for x in raw_stress]
+        except (TypeError, ValueError):
+            stress = None
+    return text, stress
 
 
 @router.get("/cases", response_model=list[PublishedCaseOut])
@@ -276,6 +355,8 @@ async def upload_attempt_audio(
     dialogue_id: Annotated[int, Form()],
     mode: Annotated[Literal["shadowing", "role_play"], Form()],
     file: Annotated[UploadFile, File()],
+    line_index: Annotated[int, Form()] = 0,
+    score: Annotated[bool, Form()] = True,
 ) -> AttemptOut:
     case, dialogue = _require_published_dialogue(dialogue_id)
     data = await file.read()
@@ -283,22 +364,84 @@ async def upload_attempt_audio(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Empty audio upload"
         )
+    reference_text, stress = _line_reference(dialogue, line_index)
+    pa_usage: dict[str, int] | None = None
+    if score:
+        allowed, used, limit = get_pa_rate_limiter().check_and_increment(user.id)
+        pa_usage = {"used": used, "limit": limit}
+        if not allowed:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Daily pronunciation score limit reached ({limit})",
+            )
     content_type = (file.content_type or "application/octet-stream").split(";")[0]
     key = f"attempts/{user.id}/{dialogue.id}/{uuid.uuid4().hex}"
     stored = get_storage().put(key, data, content_type=content_type)
-    attempt = get_learning_attempt_repository().create(
+    repo = get_learning_attempt_repository()
+    attempt = repo.create(
         user_id=user.id,
         case_id=case.id,
         dialogue_id=dialogue.id,
         mode=mode,
         audio_object_key=stored.key,
         audio_content_type=stored.content_type,
+        line_index=line_index,
+        reference_text=reference_text,
     )
-    return AttemptOut(
-        id=attempt.id,
-        case_id=attempt.case_id,
-        dialogue_id=attempt.dialogue_id,
-        mode=attempt.mode,
-        audio_object_key=attempt.audio_object_key,
-        created_at=attempt.created_at,
+    if score:
+        result = get_pronunciation_engine().assess(
+            audio=data,
+            reference_text=reference_text,
+            cefr_level=dialogue.cefr_level,
+            stress_pattern=stress,
+        )
+        attempt = repo.save_score(
+            attempt_id=attempt.id,
+            score=result_to_dict(result),
+            line_index=line_index,
+            reference_text=reference_text,
+        )
+    return _attempt_out(attempt, pa_usage=pa_usage)
+
+
+@router.post("/attempts/{attempt_id}/score", response_model=AttemptOut)
+def score_attempt(
+    attempt_id: int,
+    body: ScoreAttemptIn,
+    user: Annotated[UserRecord, Depends(require_learner_access)],
+) -> AttemptOut:
+    repo = get_learning_attempt_repository()
+    attempt = repo.get_by_id(attempt_id)
+    if attempt is None or attempt.user_id != user.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Attempt not found"
+        )
+    _, dialogue = _require_published_dialogue(attempt.dialogue_id)
+    reference_text, stress = _line_reference(dialogue, body.line_index)
+    allowed, used, limit = get_pa_rate_limiter().check_and_increment(user.id)
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Daily pronunciation score limit reached ({limit})",
+        )
+    try:
+        audio = get_storage().get(attempt.audio_object_key)
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Attempt audio missing from storage",
+        ) from exc
+
+    result = get_pronunciation_engine().assess(
+        audio=audio,
+        reference_text=reference_text,
+        cefr_level=dialogue.cefr_level,
+        stress_pattern=stress,
     )
+    updated = repo.save_score(
+        attempt_id=attempt.id,
+        score=result_to_dict(result),
+        line_index=body.line_index,
+        reference_text=reference_text,
+    )
+    return _attempt_out(updated, pa_usage={"used": used, "limit": limit})
