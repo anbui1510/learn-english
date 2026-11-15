@@ -4,18 +4,18 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from app.auth.deps import get_current_user, require_editor
+from app.auth.deps import require_editor
 from app.auth.settings import get_auth_settings
+from app.cases.access import PDF_MIME, can_access_case
 from app.cases.repository import CaseRecord
 from app.cases.service import get_case_repository
 from app.storage.factory import get_storage
 from app.users.repository import UserRecord
 
 router = APIRouter(prefix="/editor", tags=["editor"])
-
-PDF_MIME = "application/pdf"
 
 
 class EditorPingOut(BaseModel):
@@ -61,10 +61,6 @@ def _case_out(case: CaseRecord) -> CaseOut:
         created_at=case.created_at,
         updated_at=case.updated_at,
     )
-
-
-def _can_access_case(user: UserRecord, case: CaseRecord) -> bool:
-    return user.role == "admin" or case.owner_user_id == user.id
 
 
 @router.get("/ping", response_model=EditorPingOut)
@@ -151,7 +147,7 @@ def case_download_url(
     case = get_case_repository().get_by_id(case_id)
     if case is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
-    if not _can_access_case(user, case):
+    if not can_access_case(user, case):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not allowed to download this case PDF",
@@ -169,20 +165,13 @@ def case_download_url(
 @router.get("/cases/{case_id}/pdf")
 def stream_case_pdf(
     case_id: int,
-    user: Annotated[UserRecord, Depends(get_current_user)],
-):
-    """Session-authenticated PDF stream for owner/admin (learners 403)."""
-    from fastapi.responses import Response
-
-    if user.role not in {"editor", "admin"}:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Editor role required",
-        )
+    user: Annotated[UserRecord, Depends(require_editor)],
+) -> Response:
+    """Session-authenticated PDF stream for owner/admin (learners 403 via require_editor)."""
     case = get_case_repository().get_by_id(case_id)
     if case is None or not case.pdf_object_key:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case PDF not found")
-    if not _can_access_case(user, case):
+    if not can_access_case(user, case):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not allowed to download this case PDF",

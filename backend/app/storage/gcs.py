@@ -10,6 +10,7 @@ class GcsStorage:
 
     def __init__(self, bucket_name: str, *, location: str | None = None) -> None:
         try:
+            # Optional runtime dep — Decision 2.5: keep ignore until GCS is a required dep.
             from google.cloud import storage  # type: ignore[import-untyped]
         except ImportError as exc:  # pragma: no cover - exercised when dep missing
             raise RuntimeError(
