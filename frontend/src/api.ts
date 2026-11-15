@@ -497,6 +497,7 @@ export type Lesson = {
   session_kind?: SessionKind
   target_seconds?: number | null
   estimated_seconds?: number
+  tts_provider?: TtsProvider
 }
 
 export type ShadowingCard = {
