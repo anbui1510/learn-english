@@ -340,7 +340,7 @@ Web app giúp **bác sĩ nội trú** luyện tiếng Anh giao tiếp y khoa t�
 | NFR-03 | Chi phí | edge-tts + Gemini free tier ưu tiên | Azure metering, retry cap |
 | NFR-04 | Khả dụng | Web desktop-first responsive | Mobile roadmap |
 | NFR-05 | Tuân thủ nội dung | 100% fact traceability trên publish | Audit sample không mismatch |
-| NFR-06 | Khả dụng truy cập | WCAG cơ bản (contrast karaoke, keyboard player) | Cải thiện liên tục |
+| NFR-06 | Khả dụng truy cập | Karaoke region: keyboard ←/→/Home/End, focus ring, live line announce, ≥4.5:1 active word; see `docs/a11y-karaoke.md` | Cải thiện liên tục |
 
 ---
 

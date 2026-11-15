@@ -67,11 +67,15 @@ export function LearnerPanel({ onError }: Props) {
   const [skillTree, setSkillTree] = useState<SkillTreeNode[]>([])
   const replayAudioRef = useRef<HTMLAudioElement | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const karaokeRegionRef = useRef<HTMLDivElement | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const mediaChunksRef = useRef<Blob[]>([])
   const mediaStreamRef = useRef<MediaStream | null>(null)
 
   const current = lesson?.playlist[lineIndex] ?? null
+  const karaokeLiveLabel = current
+    ? `Line ${lineIndex + 1} of ${lesson?.playlist.length ?? 0}. ${current.speaker}: ${current.text}`
+    : ''
   const speakerColor = useMemo(() => {
     if (!current) return 'text-teal-800'
     return current.speaker.toLowerCase().includes('parent') ||
@@ -218,6 +222,44 @@ export function LearnerPanel({ onError }: Props) {
     audio.addEventListener('timeupdate', onTime)
     return () => audio.removeEventListener('timeupdate', onTime)
   }, [current, speed])
+
+  useEffect(() => {
+    const region = karaokeRegionRef.current
+    if (!region || !lesson) return
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        return
+      }
+      if (!region.contains(document.activeElement) && document.activeElement !== region) {
+        return
+      }
+      const last = lesson.playlist.length - 1
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault()
+        setLineIndex((v) => Math.max(0, v - 1))
+      } else if (event.key === 'ArrowRight') {
+        event.preventDefault()
+        setLineIndex((v) => Math.min(last, v + 1))
+      } else if (event.key === 'Home') {
+        event.preventDefault()
+        setLineIndex(0)
+      } else if (event.key === 'End') {
+        event.preventDefault()
+        setLineIndex(last)
+      }
+    }
+
+    region.addEventListener('keydown', onKeyDown)
+    return () => region.removeEventListener('keydown', onKeyDown)
+  }, [lesson])
 
   async function onSaveProfile() {
     onError(null)
@@ -531,34 +573,49 @@ export function LearnerPanel({ onError }: Props) {
 
       {lesson ? (
         <div className="mt-6">
-          <div className="rounded-lg bg-gradient-to-br from-teal-50 via-white to-orange-50 p-4">
+          <div
+            ref={karaokeRegionRef}
+            role="region"
+            aria-labelledby="karaoke-heading"
+            tabIndex={0}
+            className="rounded-lg bg-gradient-to-br from-teal-50 via-white to-orange-50 p-4 outline-none focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:ring-offset-2"
+          >
             <p className="text-xs uppercase tracking-wide text-slate-500">
               Clinic scene
             </p>
-            <h3 className="mt-1 text-lg font-semibold">{lesson.title}</h3>
+            <h3 id="karaoke-heading" className="mt-1 text-lg font-semibold">
+              {lesson.title}
+            </h3>
             <p className="mt-1 text-xs text-slate-500">
               ISBN {lesson.isbn} · edition {lesson.edition}
               {lesson.citation_pages.length
                 ? ` · pages ${lesson.citation_pages.join(', ')}`
                 : ''}
             </p>
+            <p className="mt-2 text-xs text-slate-600">
+              Keyboard: focus this player, then ← / → for lines, Home / End for
+              first / last.
+            </p>
 
             <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
-              <label>
+              <label htmlFor="karaoke-speed" className="flex items-center gap-2">
                 Speed
                 <input
+                  id="karaoke-speed"
                   type="range"
                   min={0.5}
                   max={1.25}
                   step={0.05}
                   value={speed}
                   onChange={(e) => setSpeed(Number(e.target.value))}
-                  className="ml-2 align-middle"
+                  className="align-middle"
+                  aria-valuetext={`${speed.toFixed(2)} times`}
                 />
-                <span className="ml-2">{speed.toFixed(2)}×</span>
+                <span aria-hidden="true">{speed.toFixed(2)}×</span>
               </label>
-              <label className="flex items-center gap-2">
+              <label htmlFor="karaoke-show-vi" className="flex items-center gap-2">
                 <input
+                  id="karaoke-show-vi"
                   type="checkbox"
                   checked={showVi}
                   onChange={(e) => setShowVi(e.target.checked)}
@@ -569,16 +626,23 @@ export function LearnerPanel({ onError }: Props) {
 
             {lesson.session_kind === 'presentation' ? (
               <div className="mt-3">
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-slate-500" id="karaoke-progress-label">
                   ~10 min presentation · line {lineIndex + 1}/
                   {lesson.playlist.length}
                   {lesson.estimated_seconds
                     ? ` · ~${Math.round(lesson.estimated_seconds / 60)} min script`
                     : ''}
                 </p>
-                <div className="mt-1 h-1.5 w-full overflow-hidden rounded bg-slate-200">
+                <div
+                  className="mt-1 h-1.5 w-full overflow-hidden rounded bg-slate-200"
+                  role="progressbar"
+                  aria-labelledby="karaoke-progress-label"
+                  aria-valuenow={lineIndex + 1}
+                  aria-valuemin={1}
+                  aria-valuemax={lesson.playlist.length}
+                >
                   <div
-                    className="h-full bg-teal-600 transition-[width] duration-300"
+                    className="h-full bg-teal-700 transition-[width] duration-300"
                     style={{
                       width: `${Math.min(
                         100,
@@ -593,14 +657,20 @@ export function LearnerPanel({ onError }: Props) {
 
             {current ? (
               <div className="mt-4">
-                <p className={`font-medium ${speakerColor}`}>{current.speaker}</p>
-                <p className="mt-2 text-base leading-relaxed">
+                <p
+                  className={`font-medium ${speakerColor}`}
+                  aria-live="polite"
+                  aria-atomic="true"
+                >
+                  {karaokeLiveLabel}
+                </p>
+                <p className="mt-2 text-base leading-relaxed text-slate-900" aria-hidden="true">
                   {current.timestamps.map((stamp, idx) => (
                     <span
                       key={`${stamp.word}-${idx}`}
                       className={
                         idx === activeWord
-                          ? 'bg-teal-200 text-teal-950'
+                          ? 'rounded-sm bg-teal-800 px-0.5 font-semibold text-white'
                           : undefined
                       }
                     >
@@ -609,13 +679,18 @@ export function LearnerPanel({ onError }: Props) {
                   ))}
                 </p>
                 {showVi && current.text_vi ? (
-                  <p className="mt-1 text-sm text-slate-600">{current.text_vi}</p>
+                  <p className="mt-1 text-sm text-slate-700">{current.text_vi}</p>
                 ) : null}
-                <audio ref={audioRef} controls className="mt-3 w-full" />
+                <audio
+                  ref={audioRef}
+                  controls
+                  className="mt-3 w-full"
+                  aria-label={`Audio for line ${lineIndex + 1}`}
+                />
                 <div className="mt-2 flex gap-2">
                   <button
                     type="button"
-                    className="text-sm underline"
+                    className="rounded-sm text-sm underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800 disabled:opacity-40"
                     disabled={lineIndex <= 0}
                     onClick={() => setLineIndex((v) => Math.max(0, v - 1))}
                   >
@@ -623,7 +698,7 @@ export function LearnerPanel({ onError }: Props) {
                   </button>
                   <button
                     type="button"
-                    className="text-sm underline"
+                    className="rounded-sm text-sm underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800 disabled:opacity-40"
                     disabled={lineIndex >= lesson.playlist.length - 1}
                     onClick={() =>
                       setLineIndex((v) =>
@@ -633,6 +708,9 @@ export function LearnerPanel({ onError }: Props) {
                   >
                     Next line
                   </button>
+                  <span className="text-sm text-slate-600" aria-live="polite">
+                    Line {lineIndex + 1} of {lesson.playlist.length}
+                  </span>
                 </div>
               </div>
             ) : null}
@@ -723,8 +801,9 @@ export function LearnerPanel({ onError }: Props) {
                           <button
                             key={`${word.word}-${index}`}
                             type="button"
-                            className="text-red-600 underline"
+                            className="text-red-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-800"
                             title={`${word.accuracy} — replay AI`}
+                            aria-label={`Replay AI sample for ${word.word}, accuracy ${word.accuracy}`}
                             onClick={() => void onReplayRedWord(word.word)}
                           >
                             {word.word}
@@ -734,8 +813,8 @@ export function LearnerPanel({ onError }: Props) {
                             key={`${word.word}-${index}`}
                             className={
                               word.band === 'green'
-                                ? 'text-emerald-700'
-                                : 'text-amber-600'
+                                ? 'text-emerald-800'
+                                : 'text-amber-800'
                             }
                             title={`${word.accuracy}`}
                           >
