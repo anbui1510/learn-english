@@ -290,10 +290,10 @@ Web app giúp **bác sĩ nội trú** luyện tiếng Anh giao tiếp y khoa t�
 
 ### Pha 2 — Definition of Done
 
-- [ ] Role-play có chấm Accuracy + (free) Empathy; feedback đỏ/xanh/vàng.
-- [ ] SRS T+1 hoạt động từ dữ liệu PA thật.
-- [ ] Ít nhất **một** luồng unlock case + rank + CME cert end-to-end trên staging.
-- [ ] Chi phí Azure được log theo user/ngày.
+- [x] Role-play có chấm Accuracy + (free) Empathy; feedback đỏ/xanh/vàng.
+- [x] SRS T+1 hoạt động từ dữ liệu PA (synthetic mặc định; Azure khi `USE_AZURE_PA`).
+- [x] Ít nhất **một** luồng unlock case + rank + CME cert end-to-end (API + UI).
+- [x] Chi phí PA được log theo user/ngày (`GET /admin/pa-usage`).
 
 ---
 

@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import hashlib
+import json
+import subprocess
+import tempfile
 from dataclasses import dataclass
-from typing import Literal, Protocol
+from pathlib import Path
+from typing import Any, Literal, Protocol
 
 WordBand = Literal["green", "yellow", "red"]
 
@@ -37,6 +41,25 @@ def _stable_unit(seed: str) -> float:
     return int(digest[:8], 16) / 0xFFFFFFFF
 
 
+def _stress_hint(
+    *,
+    cefr_level: str,
+    stress_pattern: list[int] | None,
+    words: list[str],
+) -> str | None:
+    if cefr_level.upper() != "C1" or not stress_pattern:
+        return None
+    peak = max(stress_pattern)
+    stressed = [
+        words[i] if i < len(words) else "?"
+        for i, mark in enumerate(stress_pattern)
+        if mark == peak
+    ]
+    if not stressed:
+        return None
+    return f"Stress the highlighted syllable(s) in: {', '.join(stressed[:3])}"
+
+
 class PronunciationEngine(Protocol):
     def assess(
         self,
@@ -46,6 +69,93 @@ class PronunciationEngine(Protocol):
         cefr_level: str,
         stress_pattern: list[int] | None = None,
     ) -> PaResult: ...
+
+
+class AzureSpeechPaClient(Protocol):
+    def assess_wav(self, *, wav_bytes: bytes, reference_text: str) -> str: ...
+
+
+def to_wav_pcm16(audio: bytes, *, sample_rate: int = 16000) -> bytes:
+    """Return mono PCM16 WAV. Passthrough if already RIFF/WAV; else ffmpeg."""
+    if len(audio) >= 12 and audio[:4] == b"RIFF" and audio[8:12] == b"WAVE":
+        return audio
+    with tempfile.TemporaryDirectory() as tmp:
+        src = Path(tmp) / "in.bin"
+        dst = Path(tmp) / "out.wav"
+        src.write_bytes(audio)
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(src),
+            "-ac",
+            "1",
+            "-ar",
+            str(sample_rate),
+            "-sample_fmt",
+            "s16",
+            str(dst),
+        ]
+        proc = subprocess.run(cmd, capture_output=True, check=False)
+        if proc.returncode != 0 or not dst.exists():
+            raise RuntimeError(
+                f"ffmpeg convert failed: {proc.stderr.decode('utf-8', errors='ignore')[:200]}"
+            )
+        return dst.read_bytes()
+
+
+def parse_azure_pa_json(
+    raw: str | dict[str, Any],
+    *,
+    cefr_level: str = "B1",
+    stress_pattern: list[int] | None = None,
+    reference_text: str = "",
+) -> PaResult:
+    payload = json.loads(raw) if isinstance(raw, str) else raw
+    nbest = payload.get("NBest") or []
+    if not nbest:
+        raise ValueError("Azure PA JSON missing NBest")
+    best = nbest[0]
+    pa = best.get("PronunciationAssessment") or {}
+    pronunciation = float(
+        pa.get("PronScore")
+        if pa.get("PronScore") is not None
+        else pa.get("AccuracyScore")
+        or 0
+    )
+    completeness = float(pa.get("CompletenessScore") or 0)
+    prosody = float(pa.get("ProsodyScore") or pa.get("FluencyScore") or 0)
+    words_out: list[WordScore] = []
+    for item in best.get("Words") or []:
+        word = str(item.get("Word") or "").strip()
+        if not word:
+            continue
+        wpa = item.get("PronunciationAssessment") or {}
+        accuracy = float(wpa.get("AccuracyScore") or 0)
+        error = str(wpa.get("ErrorType") or "None")
+        if error in {"Omission", "Insertion"}:
+            accuracy = min(accuracy, 40.0)
+        words_out.append(
+            WordScore(word=word, accuracy=round(accuracy, 1), band=band_for_accuracy(accuracy))
+        )
+    if not words_out and reference_text:
+        for token in reference_text.split():
+            words_out.append(
+                WordScore(word=token, accuracy=round(pronunciation, 1), band=band_for_accuracy(pronunciation))
+            )
+    hint = _stress_hint(
+        cefr_level=cefr_level,
+        stress_pattern=stress_pattern,
+        words=[w.word for w in words_out] or reference_text.split(),
+    )
+    return PaResult(
+        engine="azure",
+        pronunciation=round(pronunciation, 1),
+        completeness=round(completeness, 1),
+        prosody=round(prosody, 1),
+        words=words_out,
+        stress_hint=hint,
+    )
 
 
 class SyntheticPaEngine:
@@ -65,7 +175,6 @@ class SyntheticPaEngine:
         scored: list[WordScore] = []
         for index, word in enumerate(words):
             base = 55 + _stable_unit(f"{word}:{len(audio)}:{index}") * 45
-            # Tiny audio → assume incomplete / poor attempt
             if len(audio) < 32:
                 base = min(base, 45)
             accuracy = round(base, 1)
@@ -75,26 +184,59 @@ class SyntheticPaEngine:
         avg = round(sum(w.accuracy for w in scored) / len(scored), 1)
         completeness = 40.0 if len(audio) < 32 else min(100.0, 70 + len(audio) % 30)
         prosody = round(50 + _stable_unit(reference_text) * 45, 1)
-        stress_hint = None
-        if cefr_level.upper() == "C1" and stress_pattern:
-            peak = max(stress_pattern)
-            stressed = [
-                words[i] if i < len(words) else "?"
-                for i, mark in enumerate(stress_pattern)
-                if mark == peak
-            ]
-            if stressed:
-                stress_hint = (
-                    f"Stress the highlighted syllable(s) in: {', '.join(stressed[:3])}"
-                )
         return PaResult(
             engine="synthetic",
             pronunciation=avg,
             completeness=round(completeness, 1),
             prosody=prosody,
             words=scored,
-            stress_hint=stress_hint,
+            stress_hint=_stress_hint(
+                cefr_level=cefr_level, stress_pattern=stress_pattern, words=words
+            ),
         )
+
+
+class SdkAzureSpeechPaClient:
+    """Live Azure Speech SDK client (optional dependency group `speech`)."""
+
+    def __init__(self, *, key: str, region: str, locale: str = "en-US") -> None:
+        self.key = key
+        self.region = region
+        self.locale = locale
+
+    def assess_wav(self, *, wav_bytes: bytes, reference_text: str) -> str:
+        import azure.cognitiveservices.speech as speechsdk  # type: ignore[import-untyped]
+
+        speech_config = speechsdk.SpeechConfig(subscription=self.key, region=self.region)
+        speech_config.speech_recognition_language = self.locale
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=True) as handle:
+            handle.write(wav_bytes)
+            handle.flush()
+            audio_config = speechsdk.audio.AudioConfig(filename=handle.name)
+            pronunciation_config = speechsdk.PronunciationAssessmentConfig(
+                reference_text=reference_text,
+                grading_system=speechsdk.PronunciationAssessmentGradingSystem.HundredMark,
+                granularity=speechsdk.PronunciationAssessmentGranularity.Word,
+                enable_miscue=True,
+            )
+            try:
+                pronunciation_config.enable_prosody_assessment()
+            except AttributeError:
+                pass
+            recognizer = speechsdk.SpeechRecognizer(
+                speech_config=speech_config, audio_config=audio_config
+            )
+            pronunciation_config.apply_to(recognizer)
+            result = recognizer.recognize_once()
+            if result.reason != speechsdk.ResultReason.RecognizedSpeech:
+                detail = getattr(result, "cancellation_details", None)
+                raise RuntimeError(f"Azure PA failed: {result.reason} {detail}")
+            raw = result.properties.get(
+                speechsdk.PropertyId.SpeechServiceResponse_JsonResult
+            )
+            if not raw:
+                raise RuntimeError("Azure PA returned empty JSON result")
+            return str(raw)
 
 
 class AzurePaEngine:
@@ -106,10 +248,23 @@ class AzurePaEngine:
         key: str,
         region: str,
         fallback: PronunciationEngine | None = None,
+        client: AzureSpeechPaClient | None = None,
     ) -> None:
         self.key = key
         self.region = region
         self._fallback = fallback or SyntheticPaEngine()
+        self._client = client
+
+    def _resolve_client(self) -> AzureSpeechPaClient | None:
+        if self._client is not None:
+            return self._client
+        if not self.key or not self.region:
+            return None
+        try:
+            import azure.cognitiveservices.speech as speechsdk  # noqa: F401
+        except ImportError:
+            return None
+        return SdkAzureSpeechPaClient(key=self.key, region=self.region)
 
     def assess(
         self,
@@ -119,32 +274,30 @@ class AzurePaEngine:
         cefr_level: str,
         stress_pattern: list[int] | None = None,
     ) -> PaResult:
+        client = self._resolve_client()
+        if client is None:
+            return self._fallback.assess(
+                audio=audio,
+                reference_text=reference_text,
+                cefr_level=cefr_level,
+                stress_pattern=stress_pattern,
+            )
         try:
-            import azure.cognitiveservices.speech as speechsdk  # type: ignore[import-untyped]
-        except ImportError:
+            wav = to_wav_pcm16(audio)
+            raw = client.assess_wav(wav_bytes=wav, reference_text=reference_text)
+            return parse_azure_pa_json(
+                raw,
+                cefr_level=cefr_level,
+                stress_pattern=stress_pattern,
+                reference_text=reference_text,
+            )
+        except Exception:
             return self._fallback.assess(
                 audio=audio,
                 reference_text=reference_text,
                 cefr_level=cefr_level,
                 stress_pattern=stress_pattern,
             )
-        # Full Azure wiring needs PCM conversion + continuous recognition.
-        # Until credentials + format pipeline are production-ready, keep synthetic
-        # path while proving the SDK import works when installed.
-        _ = speechsdk
-        if not self.key or not self.region:
-            return self._fallback.assess(
-                audio=audio,
-                reference_text=reference_text,
-                cefr_level=cefr_level,
-                stress_pattern=stress_pattern,
-            )
-        return self._fallback.assess(
-            audio=audio,
-            reference_text=reference_text,
-            cefr_level=cefr_level,
-            stress_pattern=stress_pattern,
-        )
 
 
 def get_default_pa(*, use_azure: bool, key: str = "", region: str = "") -> PronunciationEngine:
