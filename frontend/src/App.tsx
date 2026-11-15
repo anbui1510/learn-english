@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { AdminUsers } from './AdminUsers'
+import { EditorUpload } from './EditorUpload'
 import { fetchMe, loginUrl, logout, type AuthUser } from './api'
 
 function App() {
@@ -54,7 +55,7 @@ function App() {
           Medical English practice
         </h1>
         <p className="max-w-prose text-slate-600">
-          Sign in with Google. Admins can assign editor and learner roles here.
+          Sign in with Google. Editors upload Nelson PDFs; admins assign roles.
         </p>
 
         <div className="flex flex-wrap items-center gap-3 pt-2">
@@ -92,6 +93,9 @@ function App() {
         ) : null}
 
         {user?.role === 'admin' ? <AdminUsers onError={handleError} /> : null}
+        {user?.role === 'editor' || user?.role === 'admin' ? (
+          <EditorUpload onError={handleError} />
+        ) : null}
       </div>
     </main>
   )

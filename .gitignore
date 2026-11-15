@@ -9,7 +9,7 @@ _bmad/custom/*.user.toml
 backend/.env
 frontend/.env
 
-# Local SQLite (MVP user/role store)
+# Local SQLite + object storage (MVP stand-ins)
 backend/data/
 
 # Python

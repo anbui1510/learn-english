@@ -72,3 +72,36 @@ export async function assignRole(
   }
   return (await response.json()) as AdminUser
 }
+
+export type CaseDraft = {
+  id: number
+  owner_user_id: number
+  title: string
+  status: string
+  isbn: string | null
+  edition: string | null
+  pdf_object_key: string | null
+  pdf_byte_size: number | null
+}
+
+export async function uploadCasePdf(input: {
+  title: string
+  isbn: string
+  edition: string
+  file: File
+}): Promise<CaseDraft> {
+  const body = new FormData()
+  body.set('title', input.title)
+  body.set('isbn', input.isbn)
+  body.set('edition', input.edition)
+  body.set('file', input.file)
+  const response = await fetch(`${API_BASE}/editor/cases/upload`, {
+    method: 'POST',
+    credentials: 'include',
+    body,
+  })
+  if (!response.ok) {
+    throw new Error(`Upload failed (${response.status})`)
+  }
+  return (await response.json()) as CaseDraft
+}

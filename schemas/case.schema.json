@@ -32,6 +32,19 @@
       "type": "string",
       "minLength": 1
     },
+    "pdf_object_key": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Object storage key for the uploaded PDF."
+    },
+    "pdf_content_type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "pdf_byte_size": {
+      "type": "integer",
+      "minimum": 1
+    },
     "created_at": {
       "type": "string",
       "minLength": 1

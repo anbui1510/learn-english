@@ -58,15 +58,21 @@ uv run pytest
 
 Roles persist in SQLite (`DATABASE_PATH`, default `backend/data/learn_english.sqlite3`). New Google users default to `learner`. Emails in `BOOTSTRAP_ADMIN_EMAILS` become `admin` on first login.
 
-### Editor RBAC + Case ownership
+### Editor RBAC + Case ownership + PDF ingest
 
 | Method | Path | Behavior |
 |--------|------|----------|
 | `GET` | `/editor/ping` | Editor/admin `200`; learner `403`; anonymous `401` |
 | `POST` | `/editor/cases` | Create draft Case owned by caller (`owner_user_id`) |
+| `POST` | `/editor/cases/upload` | Multipart PDF + title/ISBN/edition → Case draft + object key |
 | `GET` | `/editor/cases` | List cases owned by caller |
+| `GET` | `/editor/cases/{id}/download-url` | Time-limited signed URL (owner/admin); learner `403` |
+| `GET` | `/editor/cases/{id}/pdf` | Session stream of PDF for owner/admin |
+| `GET` | `/storage/local` | Local adapter signed-URL download |
 
-**RBAC matrix:** learner → 403 on editor routes; editor and admin → allowed. Cases must be owned by an editor or admin user id (learner ownership rejected in unit tests). Shared contract: `schemas/case.schema.json`.
+**RBAC matrix:** learner → 403 on editor routes; editor and admin → allowed. Cases must be owned by an editor or admin user id. Shared contract: `schemas/case.schema.json`.
+
+**Storage:** local filesystem under `STORAGE_ROOT` by default. Set `GCS_BUCKET` (and install `google-cloud-storage`) to use GCS. `PDF_MAX_BYTES` defaults to 25 MB.
 
 ### Google OAuth setup (manual verify)
 

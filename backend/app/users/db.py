@@ -32,11 +32,20 @@ CREATE TABLE IF NOT EXISTS cases (
     status TEXT NOT NULL CHECK(status IN ('draft', 'published')),
     isbn TEXT,
     edition TEXT,
+    pdf_object_key TEXT,
+    pdf_content_type TEXT,
+    pdf_byte_size INTEGER,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     FOREIGN KEY(owner_user_id) REFERENCES users(id)
 );
 """
+
+_CASE_COLUMNS: dict[str, str] = {
+    "pdf_object_key": "TEXT",
+    "pdf_content_type": "TEXT",
+    "pdf_byte_size": "INTEGER",
+}
 
 
 def connect(db_path: str | Path) -> sqlite3.Connection:
@@ -51,4 +60,10 @@ def connect(db_path: str | Path) -> sqlite3.Connection:
 
 def init_db(conn: sqlite3.Connection) -> None:
     conn.executescript(_SCHEMA)
+    existing = {
+        row[1] for row in conn.execute("PRAGMA table_info(cases)").fetchall()
+    }
+    for name, col_type in _CASE_COLUMNS.items():
+        if name not in existing:
+            conn.execute(f"ALTER TABLE cases ADD COLUMN {name} {col_type}")
     conn.commit()
