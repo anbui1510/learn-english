@@ -5,6 +5,7 @@ import { EditorFacts } from './EditorFacts'
 import { EditorUpload } from './EditorUpload'
 import { LearnerPanel } from './LearnerPanel'
 import { fetchMe, loginUrl, logout, type AuthUser } from './api'
+import { OfflineBanner } from './OfflineBanner'
 import {
   isNativePlatform,
   listenForAuthDeepLink,
@@ -105,6 +106,8 @@ function App() {
         <p className="max-w-prose text-slate-600">
           Sign in with Google. Editors publish Nelson cases; learners practice karaoke and shadowing.
         </p>
+
+        <OfflineBanner />
 
         <div className="flex flex-wrap items-center gap-3 pt-2">
           {loading ? (

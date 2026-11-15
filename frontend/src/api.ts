@@ -1,3 +1,9 @@
+import {
+  cacheDialogueOffline,
+  isBrowserOffline,
+  readCachedDialogue,
+} from './offlineCache'
+
 const API_BASE =
   import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') ??
   'http://127.0.0.1:8000'
@@ -540,28 +546,53 @@ export async function listLearnerCaseDialogues(
 }
 
 export async function fetchLesson(dialogueId: number): Promise<Lesson> {
-  const response = await fetch(
-    `${API_BASE}/learner/dialogues/${dialogueId}/lesson`,
-    { credentials: 'include' },
-  )
-  if (!response.ok) {
-    throw new Error(`Failed to load lesson (${response.status})`)
+  try {
+    const response = await fetch(
+      `${API_BASE}/learner/dialogues/${dialogueId}/lesson`,
+      { credentials: 'include' },
+    )
+    if (!response.ok) {
+      throw new Error(`Failed to load lesson (${response.status})`)
+    }
+    return (await response.json()) as Lesson
+  } catch (err) {
+    if (isBrowserOffline()) {
+      const cached = await readCachedDialogue(dialogueId)
+      if (cached) return cached.lesson
+    }
+    throw err
   }
-  return (await response.json()) as Lesson
 }
 
 export async function fetchShadowing(
   dialogueId: number,
 ): Promise<ShadowingCard[]> {
-  const response = await fetch(
-    `${API_BASE}/learner/dialogues/${dialogueId}/shadowing`,
-    { credentials: 'include' },
-  )
-  if (!response.ok) {
-    throw new Error(`Failed to load shadowing (${response.status})`)
+  try {
+    const response = await fetch(
+      `${API_BASE}/learner/dialogues/${dialogueId}/shadowing`,
+      { credentials: 'include' },
+    )
+    if (!response.ok) {
+      throw new Error(`Failed to load shadowing (${response.status})`)
+    }
+    const body = (await response.json()) as { cards: ShadowingCard[] }
+    return body.cards
+  } catch (err) {
+    if (isBrowserOffline()) {
+      const cached = await readCachedDialogue(dialogueId)
+      if (cached) return cached.shadowing
+    }
+    throw err
   }
-  const body = (await response.json()) as { cards: ShadowingCard[] }
-  return body.cards
+}
+
+/** After a successful online load, persist lesson for offline karaoke replay. */
+export async function persistDialogueOfflineCache(
+  dialogueId: number,
+  lesson: Lesson,
+  shadowing: ShadowingCard[],
+): Promise<void> {
+  await cacheDialogueOffline(dialogueId, lesson, shadowing)
 }
 
 export async function fetchLearnerProfile(): Promise<LearnerProfile> {

@@ -14,6 +14,7 @@ import {
   listLearnerCaseDialogues,
   listPublishedCases,
   patchLearnerProfile,
+  persistDialogueOfflineCache,
   synthesizeEmpathySample,
   uploadAttemptAudio,
   type AttemptScore,
@@ -27,6 +28,7 @@ import {
   type SrsCard,
 } from './api'
 import { ensureMicrophonePermission, isNativePlatform } from './mobile'
+import { resolveLessonAudioUrl } from './offlineCache'
 
 type Props = {
   onError: (message: string | null) => void
@@ -157,6 +159,9 @@ export function LearnerPanel({ onError }: Props) {
         setLineIndex(0)
         setCardIndex(0)
         setActiveWord(-1)
+        if (navigator.onLine) {
+          void persistDialogueOfflineCache(dialogueId, lessonBody, shadowCards)
+        }
       } catch (err) {
         if (!cancelled) {
           onError(err instanceof Error ? err.message : 'Failed to load lesson')
@@ -170,12 +175,30 @@ export function LearnerPanel({ onError }: Props) {
 
   useEffect(() => {
     const audio = audioRef.current
-    if (!audio || !current) return
+    if (!audio || !current || dialogueId == null) return
+    let revoked: string | null = null
+    let cancelled = false
     audio.pause()
-    audio.src = current.audio_url
-    audio.playbackRate = speed
-    setActiveWord(-1)
-  }, [current, speed])
+    ;(async () => {
+      const src = await resolveLessonAudioUrl(
+        dialogueId,
+        lineIndex,
+        current.audio_url,
+      )
+      if (cancelled) {
+        if (src.startsWith('blob:')) URL.revokeObjectURL(src)
+        return
+      }
+      if (src.startsWith('blob:')) revoked = src
+      audio.src = src
+      audio.playbackRate = speed
+      setActiveWord(-1)
+    })()
+    return () => {
+      cancelled = true
+      if (revoked) URL.revokeObjectURL(revoked)
+    }
+  }, [current, speed, dialogueId, lineIndex])
 
   useEffect(() => {
     const audio = audioRef.current

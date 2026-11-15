@@ -23,11 +23,14 @@ Then Run ▶ in Android Studio.
 
 ## iOS (macOS)
 
+The `frontend/ios/` Xcode project is committed. Build/run still needs macOS + Xcode:
+
 ```bash
 cd frontend
-npx cap add ios   # once
 npm run cap:ios
 ```
+
+OAuth URL scheme `com.learnenglish.app` and mic usage string are in `ios/App/App/Info.plist`.
 
 ## Backend CORS / cookies
 
@@ -61,8 +64,15 @@ For production mobile auth against HTTPS APIs, also set `COOKIE_SECURE=true` and
 ## Mic permission
 
 Android `RECORD_AUDIO` is declared in `android/app/src/main/AndroidManifest.xml`.
+iOS uses `NSMicrophoneUsageDescription` in Info.plist.
 The learner role-play button requests `getUserMedia` and surfaces a denial message
 when permission is blocked.
+
+## Offline karaoke cache
+
+Opening a dialogue online stores lesson JSON (IndexedDB, last 3) and line audio
+(Cache API). Offline, `fetchLesson` / `fetchShadowing` fall back to cache and the
+UI shows an offline banner. Scoring, uploads, and new downloads still need network.
 
 ## Sync after web changes
 

@@ -46,7 +46,8 @@ CI (`.github/workflows/ci.yml`) runs backend `pytest` and frontend `npm run buil
 | Method | Path | Behavior |
 |--------|------|----------|
 | `GET` | `/auth/google/login` | Redirect to Google (503 if env missing) |
-| `GET` | `/auth/google/callback` | Upsert user + httpOnly JWT cookie → SPA |
+| `GET` | `/auth/google/callback` | Upsert user + httpOnly JWT cookie → SPA (or mobile deep-link + one-time code) |
+| `POST` | `/auth/exchange` | Exchange mobile OAuth one-time `code` for session cookie |
 | `GET` | `/auth/me` | Current user + **role** from DB (`401` if anonymous) |
 | `POST` | `/auth/logout` | Clear session cookie |
 
@@ -127,7 +128,7 @@ TTS defaults to a silent-WAV synthetic engine (CI-safe). Set `USE_EDGE_TTS=true`
 
 **Pha 3 premium TTS:** org `tts_provider` + `premium_enabled` cost flag (`/admin/tts-settings`). Providers: synthetic / edge / Azure Neural / ElevenLabs (keys via env; premium gate required for paid engines).
 
-**Pha 3 mobile (Capacitor):** Android shell under `frontend/android/` wraps the Vite build (`npm run cap:android`). See [docs/mobile-capacitor.md](docs/mobile-capacitor.md).
+**Pha 3 mobile (Capacitor):** Android + iOS shells under `frontend/android/` / `frontend/ios/` (`npm run cap:android` / `cap:ios`). OAuth deep-link return + offline karaoke cache (last 3 dialogues). See [docs/mobile-capacitor.md](docs/mobile-capacitor.md).
 
 ### Google OAuth setup (manual verify)
 
