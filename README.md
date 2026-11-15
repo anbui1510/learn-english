@@ -110,7 +110,7 @@ TTS defaults to a silent-WAV synthetic engine (CI-safe). Set `USE_EDGE_TTS=true`
 
 **Pha 2 pronunciation:** upload/score returns pronunciation / completeness / prosody plus per-word green/yellow/red bands. Default engine is synthetic (CI-safe). Set `USE_AZURE_PA=true` + `AZURE_SPEECH_KEY` (optional `uv sync --group speech`) for Azure: WebM/other formats convert to 16 kHz mono PCM via ffmpeg, then Speech SDK Pronunciation Assessment; failures fall back to synthetic. `PA_DAILY_LIMIT` caps score calls per user/day.
 
-**Pha 2 learning loop:** red/yellow PA words enqueue SRS cards for T+1. Role-play supports `read_along` vs `free_speech`; free speech adds synthetic empathy rubric + clinical disclaimer (`USE_GEMINI_EMPATHY` reserved).
+**Pha 2 learning loop:** red/yellow PA words enqueue SRS cards for T+1. Role-play supports `read_along` vs `free_speech`; free speech adds empathy rubric + clinical disclaimer (`USE_GEMINI_EMPATHY` + `GEMINI_API_KEY` for Gemini; synthetic fallback).
 
 **Pha 2 progression:** lesson completion awards virtual CME (+ role-play PA bonus). Rank ladder Medical Student → Chief of Staff. Editors set `module_slug` / unlock CME / unlock rank / prerequisite case (cycle-safe). Module CME threshold issues a shareable digital certificate with disclaimer.
 

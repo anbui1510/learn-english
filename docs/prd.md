@@ -237,7 +237,7 @@ Web app giúp **bác sĩ nội trú** luyện tiếng Anh giao tiếp y khoa t�
 |----|------------|---------------------|
 | US-G2-010 | Là **learner**, tôi role-play **read-along** (đọc script), để luyện accuracy. | So khớp reference text; PA word-level. |
 | US-G2-011 | Là **learner**, tôi role-play **free response**, để luyện giao tiếp tự do. | Transcript STT; không bắt buộc khớp 100% script. |
-| US-G2-012 | Là **hệ thống**, với free response, tôi chấm **Empathy** bằng LLM rubric, để đánh giá trấn an/lịch sự (đặc biệt báo tin xấu). | Chỉ khi `response_mode=free_speech`; output structured; disclaimer không thay tư vấn lâm sàng. |
+| US-G2-012 | Là **hệ thống**, với free response, tôi chấm **Empathy** bằng LLM rubric, để đánh giá trấn an/lịch sự (đặc biệt báo tin xấu). | `USE_GEMINI_EMPATHY` + `GEMINI_API_KEY` → Gemini structured rubric; synthetic fallback on failure; coaching tip when &lt;75; disclaimer. |
 
 ---
 
