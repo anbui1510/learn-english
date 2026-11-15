@@ -58,6 +58,25 @@ def _vi_gloss(text: str) -> str:
     return f"[VI] {text}"
 
 
+def build_stress_pattern(text: str, *, min_alpha: int = 10) -> list[int] | None:
+    """Mark the longest clinical-length token as stress peak (1–3 scale)."""
+    tokens = text.split()
+    if not tokens:
+        return None
+    best_i = -1
+    best_len = 0
+    for index, token in enumerate(tokens):
+        alpha = "".join(ch for ch in token if ch.isalpha())
+        if len(alpha) >= min_alpha and len(alpha) > best_len:
+            best_len = len(alpha)
+            best_i = index
+    if best_i < 0:
+        return None
+    pattern = [1] * len(tokens)
+    pattern[best_i] = 3
+    return pattern
+
+
 class TemplateDialogueGenerator:
     """CI-safe generator: wraps verified fact text only (no clinical invention)."""
 
@@ -105,6 +124,7 @@ class TemplateDialogueGenerator:
         text: str,
         fact: FactRecord,
         include_vi: bool,
+        cefr_level: CefrLevel,
         is_key_phrase: bool = False,
     ) -> dict[str, Any]:
         line: dict[str, Any] = {
@@ -116,6 +136,10 @@ class TemplateDialogueGenerator:
             line["text_vi"] = _vi_gloss(text)
         if is_key_phrase:
             line["is_key_phrase"] = True
+        if cefr_level == "C1":
+            pattern = build_stress_pattern(text)
+            if pattern is not None:
+                line["stress_pattern"] = pattern
         return line
 
     def _presentation_lines(
@@ -148,6 +172,7 @@ class TemplateDialogueGenerator:
                         text=text,
                         fact=fact,
                         include_vi=include_vi,
+                        cefr_level=cefr_level,
                         is_key_phrase=cycle == 0 and index == 0,
                     )
                 )
@@ -172,6 +197,7 @@ class TemplateDialogueGenerator:
                     text=wrapped,
                     fact=fact,
                     include_vi=include_vi,
+                    cefr_level=cefr_level,
                     is_key_phrase=index == 0,
                 )
             )
@@ -195,6 +221,7 @@ class TemplateDialogueGenerator:
                     text=text,
                     fact=fact,
                     include_vi=include_vi,
+                    cefr_level=cefr_level,
                     is_key_phrase=label == "Recommendation",
                 )
             )
@@ -216,6 +243,7 @@ class TemplateDialogueGenerator:
                     text=text,
                     fact=fact,
                     include_vi=include_vi,
+                    cefr_level=cefr_level,
                     is_key_phrase=index == 0,
                 )
             )

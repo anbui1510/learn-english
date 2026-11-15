@@ -65,7 +65,7 @@ def test_parse_azure_pa_json_maps_scores_and_bands() -> None:
     result = parse_azure_pa_json(
         json.dumps(SAMPLE_AZURE_JSON),
         cefr_level="C1",
-        stress_pattern=[1, 3, 1],
+        stress_pattern=[3, 1, 1],
         reference_text="bronchiolitis supportive care",
     )
     assert result.engine == "azure"
@@ -73,7 +73,9 @@ def test_parse_azure_pa_json_maps_scores_and_bands() -> None:
     assert result.completeness == 92.5
     assert result.prosody == 79.0
     assert [w.band for w in result.words] == ["red", "green", "yellow"]
+    # Peak stress on red "bronchiolitis" → gated hint fires.
     assert result.stress_hint is not None
+    assert "bronchiolitis" in result.stress_hint.lower()
 
 
 def test_azure_engine_uses_injected_client() -> None:

@@ -41,23 +41,38 @@ def _stable_unit(seed: str) -> float:
     return int(digest[:8], 16) / 0xFFFFFFFF
 
 
+_PROSODY_STRESS_GATE = 75.0
+
+
 def _stress_hint(
     *,
     cefr_level: str,
     stress_pattern: list[int] | None,
-    words: list[str],
+    words: list[WordScore] | list[str],
+    prosody: float,
 ) -> str | None:
+    """C1 stress coaching only when prosody is weak or a stressed word is not green."""
     if cefr_level.upper() != "C1" or not stress_pattern:
         return None
     peak = max(stress_pattern)
-    stressed = [
-        words[i] if i < len(words) else "?"
+    scored: list[WordScore] = []
+    for item in words:
+        if isinstance(item, WordScore):
+            scored.append(item)
+        else:
+            scored.append(WordScore(word=str(item), accuracy=100.0, band="green"))
+    stressed_scores = [
+        scored[i] if i < len(scored) else WordScore(word="?", accuracy=0.0, band="red")
         for i, mark in enumerate(stress_pattern)
         if mark == peak
     ]
-    if not stressed:
+    if not stressed_scores:
         return None
-    return f"Stress the highlighted syllable(s) in: {', '.join(stressed[:3])}"
+    stressed_wrong = any(w.band != "green" for w in stressed_scores)
+    if prosody >= _PROSODY_STRESS_GATE and not stressed_wrong:
+        return None
+    labels = [w.word for w in stressed_scores]
+    return f"Stress the highlighted syllable(s) in: {', '.join(labels[:3])}"
 
 
 class PronunciationEngine(Protocol):
@@ -146,7 +161,12 @@ def parse_azure_pa_json(
     hint = _stress_hint(
         cefr_level=cefr_level,
         stress_pattern=stress_pattern,
-        words=[w.word for w in words_out] or reference_text.split(),
+        words=words_out
+        or [
+            WordScore(word=t, accuracy=round(pronunciation, 1), band=band_for_accuracy(pronunciation))
+            for t in reference_text.split()
+        ],
+        prosody=prosody,
     )
     return PaResult(
         engine="azure",
@@ -191,7 +211,10 @@ class SyntheticPaEngine:
             prosody=prosody,
             words=scored,
             stress_hint=_stress_hint(
-                cefr_level=cefr_level, stress_pattern=stress_pattern, words=words
+                cefr_level=cefr_level,
+                stress_pattern=stress_pattern,
+                words=scored,
+                prosody=prosody,
             ),
         )
 

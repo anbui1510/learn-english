@@ -22,7 +22,15 @@ def test_band_and_synthetic_engine() -> None:
     assert result.engine == "synthetic"
     assert len(result.words) == 3
     assert all(w.band in {"green", "yellow", "red"} for w in result.words)
-    assert result.stress_hint
+    # Hint only when prosody weak or stressed word not green (gate in _stress_hint).
+    if result.prosody < 75 or any(
+        w.band != "green"
+        for i, w in enumerate(result.words)
+        if i < len([1, 3, 1]) and [1, 3, 1][i] == 3
+    ):
+        assert result.stress_hint
+    else:
+        assert result.stress_hint is None
 
 
 def test_pa_rate_limiter(tmp_path) -> None:
