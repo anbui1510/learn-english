@@ -10,6 +10,7 @@ from app.users.db import connect, init_db
 from app.users.repository import UserRecord
 
 CaseStatus = Literal["draft", "published"]
+ExtractStatus = Literal["none", "queued", "running", "succeeded", "failed"]
 
 
 @dataclass(frozen=True)
@@ -23,6 +24,10 @@ class CaseRecord:
     pdf_object_key: str | None
     pdf_content_type: str | None
     pdf_byte_size: int | None
+    extract_status: ExtractStatus
+    extract_error: str | None
+    extract_started_at: str | None
+    extract_finished_at: str | None
     created_at: str
     updated_at: str
 
@@ -33,6 +38,9 @@ def _now() -> str:
 
 def _row_to_case(row: sqlite3.Row) -> CaseRecord:
     keys = row.keys()
+    extract_status = (
+        row["extract_status"] if "extract_status" in keys and row["extract_status"] else "none"
+    )
     return CaseRecord(
         id=row["id"],
         owner_user_id=row["owner_user_id"],
@@ -45,6 +53,14 @@ def _row_to_case(row: sqlite3.Row) -> CaseRecord:
             row["pdf_content_type"] if "pdf_content_type" in keys else None
         ),
         pdf_byte_size=row["pdf_byte_size"] if "pdf_byte_size" in keys else None,
+        extract_status=extract_status,
+        extract_error=row["extract_error"] if "extract_error" in keys else None,
+        extract_started_at=(
+            row["extract_started_at"] if "extract_started_at" in keys else None
+        ),
+        extract_finished_at=(
+            row["extract_finished_at"] if "extract_finished_at" in keys else None
+        ),
         created_at=row["created_at"],
         updated_at=row["updated_at"],
     )
@@ -81,9 +97,9 @@ class CaseRepository:
                 INSERT INTO cases (
                     owner_user_id, title, status, isbn, edition,
                     pdf_object_key, pdf_content_type, pdf_byte_size,
-                    created_at, updated_at
+                    extract_status, created_at, updated_at
                 )
-                VALUES (?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, 'draft', ?, ?, ?, ?, ?, 'none', ?, ?)
                 """,
                 (
                     owner.id,
@@ -126,6 +142,53 @@ class CaseRepository:
             ).fetchall()
             return [_row_to_case(row) for row in rows]
 
+    def set_extract_status(
+        self,
+        case_id: int,
+        *,
+        status: ExtractStatus,
+        error: str | None = None,
+    ) -> CaseRecord:
+        now = _now()
+        with self._conn() as conn:
+            existing = conn.execute(
+                "SELECT * FROM cases WHERE id = ?",
+                (case_id,),
+            ).fetchone()
+            if existing is None:
+                raise KeyError(f"case {case_id} not found")
+
+            started_at = existing["extract_started_at"]
+            finished_at = existing["extract_finished_at"]
+            if status in {"queued", "running"}:
+                if status == "queued" or started_at is None:
+                    started_at = now
+                finished_at = None
+            elif status in {"succeeded", "failed"}:
+                finished_at = now
+                if started_at is None:
+                    started_at = now
+
+            conn.execute(
+                """
+                UPDATE cases
+                SET extract_status = ?,
+                    extract_error = ?,
+                    extract_started_at = ?,
+                    extract_finished_at = ?,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (status, error, started_at, finished_at, now, case_id),
+            )
+            conn.commit()
+            row = conn.execute(
+                "SELECT * FROM cases WHERE id = ?",
+                (case_id,),
+            ).fetchone()
+            assert row is not None
+            return _row_to_case(row)
+
     def reassign_owner(
         self,
         *,
@@ -158,4 +221,4 @@ class CaseRepository:
             return _row_to_case(row)
 
 
-__all__ = ["CaseRecord", "CaseRepository"]
+__all__ = ["CaseRecord", "CaseRepository", "ExtractStatus"]

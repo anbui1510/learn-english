@@ -35,9 +35,31 @@ CREATE TABLE IF NOT EXISTS cases (
     pdf_object_key TEXT,
     pdf_content_type TEXT,
     pdf_byte_size INTEGER,
+    extract_status TEXT NOT NULL DEFAULT 'none'
+        CHECK(extract_status IN ('none', 'queued', 'running', 'succeeded', 'failed')),
+    extract_error TEXT,
+    extract_started_at TEXT,
+    extract_finished_at TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     FOREIGN KEY(owner_user_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS facts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id INTEGER NOT NULL,
+    source_quote TEXT NOT NULL,
+    atomic_fact TEXT NOT NULL,
+    category TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('needs_review', 'verified')),
+    page INTEGER NOT NULL CHECK(page >= 1),
+    chapter TEXT,
+    section TEXT,
+    isbn TEXT NOT NULL,
+    edition TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY(case_id) REFERENCES cases(id) ON DELETE CASCADE
 );
 """
 
@@ -45,6 +67,10 @@ _CASE_COLUMNS: dict[str, str] = {
     "pdf_object_key": "TEXT",
     "pdf_content_type": "TEXT",
     "pdf_byte_size": "INTEGER",
+    "extract_status": "TEXT NOT NULL DEFAULT 'none'",
+    "extract_error": "TEXT",
+    "extract_started_at": "TEXT",
+    "extract_finished_at": "TEXT",
 }
 
 

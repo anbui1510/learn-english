@@ -73,6 +73,13 @@ export async function assignRole(
   return (await response.json()) as AdminUser
 }
 
+export type ExtractStatus =
+  | 'none'
+  | 'queued'
+  | 'running'
+  | 'succeeded'
+  | 'failed'
+
 export type CaseDraft = {
   id: number
   owner_user_id: number
@@ -82,6 +89,21 @@ export type CaseDraft = {
   edition: string | null
   pdf_object_key: string | null
   pdf_byte_size: number | null
+  extract_status: ExtractStatus
+  extract_error: string | null
+}
+
+export type ClinicalFact = {
+  id: number
+  case_id: number
+  source_quote: string
+  atomic_fact: string
+  category: string
+  status: 'needs_review' | 'verified'
+  page: number
+  section: string | null
+  isbn: string
+  edition: string
 }
 
 export async function uploadCasePdf(input: {
@@ -104,4 +126,58 @@ export async function uploadCasePdf(input: {
     throw new Error(`Upload failed (${response.status})`)
   }
   return (await response.json()) as CaseDraft
+}
+
+export async function listMyCases(): Promise<CaseDraft[]> {
+  const response = await fetch(`${API_BASE}/editor/cases`, {
+    credentials: 'include',
+  })
+  if (!response.ok) {
+    throw new Error(`Failed to list cases (${response.status})`)
+  }
+  return (await response.json()) as CaseDraft[]
+}
+
+export async function getCase(caseId: number): Promise<CaseDraft> {
+  const response = await fetch(`${API_BASE}/editor/cases/${caseId}`, {
+    credentials: 'include',
+  })
+  if (!response.ok) {
+    throw new Error(`Failed to load case (${response.status})`)
+  }
+  return (await response.json()) as CaseDraft
+}
+
+export async function startExtract(
+  caseId: number,
+): Promise<{ case_id: number; extract_status: ExtractStatus }> {
+  const response = await fetch(`${API_BASE}/editor/cases/${caseId}/extract`, {
+    method: 'POST',
+    credentials: 'include',
+  })
+  if (!response.ok) {
+    throw new Error(`Extract failed (${response.status})`)
+  }
+  return (await response.json()) as {
+    case_id: number
+    extract_status: ExtractStatus
+  }
+}
+
+export async function listCaseFacts(
+  caseId: number,
+  filters?: { status?: string; category?: string },
+): Promise<ClinicalFact[]> {
+  const params = new URLSearchParams()
+  if (filters?.status) params.set('status', filters.status)
+  if (filters?.category) params.set('category', filters.category)
+  const qs = params.toString()
+  const response = await fetch(
+    `${API_BASE}/editor/cases/${caseId}/facts${qs ? `?${qs}` : ''}`,
+    { credentials: 'include' },
+  )
+  if (!response.ok) {
+    throw new Error(`Failed to list facts (${response.status})`)
+  }
+  return (await response.json()) as ClinicalFact[]
 }

@@ -66,13 +66,18 @@ Roles persist in SQLite (`DATABASE_PATH`, default `backend/data/learn_english.sq
 | `POST` | `/editor/cases` | Create draft Case owned by caller (`owner_user_id`) |
 | `POST` | `/editor/cases/upload` | Multipart PDF + title/ISBN/edition → Case draft + object key |
 | `GET` | `/editor/cases` | List cases owned by caller |
+| `GET` | `/editor/cases/{id}` | Case detail including extract job status |
+| `POST` | `/editor/cases/{id}/extract` | Queue in-process fact extraction (owner/admin) |
+| `GET` | `/editor/cases/{id}/facts` | List facts; optional `status` / `category` filters |
 | `GET` | `/editor/cases/{id}/download-url` | Time-limited signed URL (owner/admin); learner `403` |
 | `GET` | `/editor/cases/{id}/pdf` | Session stream of PDF for owner/admin |
 | `GET` | `/storage/local` | Local adapter signed-URL download |
 
-**RBAC matrix:** learner → 403 on editor routes; editor and admin → allowed. Cases must be owned by an editor or admin user id. Shared contract: `schemas/case.schema.json`.
+**RBAC matrix:** learner → 403 on editor routes; editor and admin → allowed. Cases must be owned by an editor or admin user id. Shared contracts: `schemas/case.schema.json`, `schemas/clinical-fact.schema.json`.
 
 **Storage:** local filesystem under `STORAGE_ROOT` by default. Set `GCS_BUCKET` (and install `google-cloud-storage`) to use GCS. `PDF_MAX_BYTES` defaults to 25 MB.
+
+**Fact extraction:** parser port defaults to pypdf + clinical heading heuristics (Docling optional when installed). Facts default to `needs_review` and validate against the clinical-fact schema before write.
 
 ### Google OAuth setup (manual verify)
 

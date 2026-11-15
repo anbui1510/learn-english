@@ -97,7 +97,8 @@ export function EditorUpload({ onError }: Props) {
           </p>
           <p className="text-slate-500">
             ISBN {created.isbn} · edition {created.edition} ·{' '}
-            {created.pdf_byte_size ?? 0} bytes
+            {created.pdf_byte_size ?? 0} bytes · extract{' '}
+            {created.extract_status}
           </p>
         </div>
       ) : null}

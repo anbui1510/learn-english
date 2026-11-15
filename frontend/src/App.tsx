@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { AdminUsers } from './AdminUsers'
+import { EditorFacts } from './EditorFacts'
 import { EditorUpload } from './EditorUpload'
 import { fetchMe, loginUrl, logout, type AuthUser } from './api'
 
@@ -94,7 +95,10 @@ function App() {
 
         {user?.role === 'admin' ? <AdminUsers onError={handleError} /> : null}
         {user?.role === 'editor' || user?.role === 'admin' ? (
-          <EditorUpload onError={handleError} />
+          <>
+            <EditorUpload onError={handleError} />
+            <EditorFacts onError={handleError} />
+          </>
         ) : null}
       </div>
     </main>
