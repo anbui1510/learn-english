@@ -5,6 +5,11 @@ import { EditorFacts } from './EditorFacts'
 import { EditorUpload } from './EditorUpload'
 import { LearnerPanel } from './LearnerPanel'
 import { fetchMe, loginUrl, logout, type AuthUser } from './api'
+import {
+  isNativePlatform,
+  listenForAuthDeepLink,
+  startNativeGoogleLogin,
+} from './mobile'
 
 function App() {
   const [user, setUser] = useState<AuthUser | null>(null)
@@ -15,9 +20,16 @@ function App() {
     [],
   )
   const [showCert, setShowCert] = useState(Boolean(certSlug))
+  const native = useMemo(() => isNativePlatform(), [])
 
   const handleError = useCallback((message: string | null) => {
     setError(message)
+  }, [])
+
+  const refreshSession = useCallback(async () => {
+    const me = await fetchMe()
+    setUser(me)
+    setLoading(false)
   }, [])
 
   useEffect(() => {
@@ -43,6 +55,25 @@ function App() {
     }
   }, [])
 
+  useEffect(() => {
+    let remove: (() => void) | undefined
+    void listenForAuthDeepLink(async () => {
+      setError(null)
+      setLoading(true)
+      try {
+        await refreshSession()
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Could not finish sign-in')
+        setLoading(false)
+      }
+    }).then((cleanup) => {
+      remove = cleanup
+    })
+    return () => {
+      remove?.()
+    }
+  }, [refreshSession])
+
   async function onLogout() {
     setError(null)
     try {
@@ -50,6 +81,15 @@ function App() {
       setUser(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Logout failed')
+    }
+  }
+
+  async function onNativeLogin() {
+    setError(null)
+    try {
+      await startNativeGoogleLogin()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not open Google sign-in')
     }
   }
 
@@ -84,6 +124,14 @@ function App() {
                 Log out
               </button>
             </>
+          ) : native ? (
+            <button
+              type="button"
+              onClick={() => void onNativeLogin()}
+              className="rounded-md bg-teal-700 px-3 py-2 text-sm font-medium text-white hover:bg-teal-600"
+            >
+              Sign in with Google
+            </button>
           ) : (
             <a
               href={loginUrl()}

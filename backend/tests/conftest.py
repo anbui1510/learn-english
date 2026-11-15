@@ -4,6 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.auth.jwt_tokens import create_session_token
+from app.auth.mobile_return import clear_auth_codes
 from app.auth.oauth import reset_oauth_registration
 from app.auth.settings import AuthSettings, clear_auth_settings_cache, get_auth_settings
 from app.cases.service import clear_case_repository_cache
@@ -33,6 +34,7 @@ def _clear_all_caches() -> None:
     clear_utterance_repository_cache()
     clear_learner_caches()
     clear_storage_cache()
+    clear_auth_codes()
     reset_oauth_registration()
 
 

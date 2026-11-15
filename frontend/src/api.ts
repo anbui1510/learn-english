@@ -20,8 +20,27 @@ export type AdminUser = {
   google_sub: string
 }
 
-export function loginUrl(): string {
-  return `${API_BASE}/auth/google/login`
+export function loginUrl(returnTo?: string): string {
+  const base = `${API_BASE}/auth/google/login`
+  if (!returnTo) return base
+  const url = new URL(base)
+  url.searchParams.set('return_to', returnTo)
+  return url.toString()
+}
+
+/** Capacitor deep-link target used after Google OAuth (Custom Tab / Browser). */
+export const MOBILE_AUTH_RETURN_URI = 'com.learnenglish.app://auth/callback'
+
+export async function exchangeAuthCode(code: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/auth/exchange`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code }),
+  })
+  if (!response.ok) {
+    throw new Error(`Auth exchange failed (${response.status})`)
+  }
 }
 
 export async function fetchMe(): Promise<AuthUser | null> {

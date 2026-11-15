@@ -44,8 +44,19 @@ FRONTEND_ORIGIN=https://your.app.domain
 FRONTEND_ORIGINS=https://localhost,capacitor://localhost,...
 ```
 
-Google OAuth still redirects to the configured web `FRONTEND_ORIGIN` after login;
-deep-link return into the shell is a follow-up if store distribution needs it.
+### OAuth return into the shell
+
+Native sign-in opens Google in a Custom Tab (`@capacitor/browser`) with
+`return_to=com.learnenglish.app://auth/callback`. After Google callback, the API
+redirects to that deep link with a **one-time** `code` (never the JWT). The app
+exchanges it via `POST /auth/exchange` and receives the `le_session` cookie.
+
+Allowlist via `MOBILE_AUTH_RETURN_URIS` (defaults include `https://localhost/` and
+`com.learnenglish.app://auth/callback`). Unlisted `return_to` values fall back to
+`FRONTEND_ORIGIN`.
+
+For production mobile auth against HTTPS APIs, also set `COOKIE_SECURE=true` and
+`COOKIE_SAMESITE=none` so the WebView can store the session cookie cross-origin.
 
 ## Mic permission
 

@@ -4,6 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
+from pydantic import BaseModel, Field
 
 from app.auth.deps import get_current_user
 from app.auth.jwt_tokens import (
@@ -12,6 +13,14 @@ from app.auth.jwt_tokens import (
     current_identity_from_request,
     set_session_cookie,
 )
+from app.auth.mobile_return import (
+    append_query_param,
+    consume_auth_code,
+    is_allowed_return_to,
+    issue_auth_code,
+    needs_auth_code_handoff,
+    resolve_post_auth_redirect,
+)
 from app.auth.oauth import ensure_google_client, oauth
 from app.auth.settings import get_auth_settings
 from app.users.repository import UserRecord
@@ -19,15 +28,28 @@ from app.users.service import bootstrap_admin_emails, get_user_repository
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+_SESSION_RETURN_KEY = "oauth_return_to"
+
+
+class ExchangeBody(BaseModel):
+    code: str = Field(min_length=8, max_length=256)
+
 
 @router.get("/google/login")
-async def google_login(request: Request) -> RedirectResponse:
+async def google_login(
+    request: Request,
+    return_to: str | None = None,
+) -> RedirectResponse:
     settings = get_auth_settings()
     if not ensure_google_client(settings):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Google OAuth is not configured",
         )
+    if return_to and is_allowed_return_to(settings, return_to):
+        request.session[_SESSION_RETURN_KEY] = return_to.strip()
+    else:
+        request.session.pop(_SESSION_RETURN_KEY, None)
     return await oauth.google.authorize_redirect(request, settings.google_redirect_uri)
 
 
@@ -70,9 +92,30 @@ async def google_callback(request: Request) -> RedirectResponse:
         name=user.name,
         role=user.role,
     )
-    response = RedirectResponse(url=settings.frontend_origin, status_code=302)
+    return_to = request.session.pop(_SESSION_RETURN_KEY, None)
+    redirect_url = resolve_post_auth_redirect(settings, return_to)
+
+    if needs_auth_code_handoff(redirect_url):
+        code = issue_auth_code(session_jwt)
+        redirect_url = append_query_param(redirect_url, "code", code)
+        return RedirectResponse(url=redirect_url, status_code=302)
+
+    response = RedirectResponse(url=redirect_url, status_code=302)
     set_session_cookie(response, settings, session_jwt)
     return response
+
+
+@router.post("/exchange")
+async def exchange_auth_code(body: ExchangeBody, response: Response) -> dict[str, str]:
+    settings = get_auth_settings()
+    session_jwt = consume_auth_code(body.code.strip())
+    if not session_jwt:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired auth code",
+        )
+    set_session_cookie(response, settings, session_jwt)
+    return {"status": "ok"}
 
 
 @router.get("/me")

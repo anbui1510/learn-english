@@ -26,6 +26,7 @@ class AuthSettings:
     session_secret: str
     frontend_origin: str
     frontend_origins: tuple[str, ...]
+    mobile_auth_return_uris: tuple[str, ...]
     cookie_name: str
     cookie_secure: bool
     cookie_max_age: int
@@ -106,6 +107,12 @@ def get_auth_settings() -> AuthSettings:
                         )
                     ),
                 ]
+            )
+        ),
+        mobile_auth_return_uris=_parse_origins(
+            _env(
+                "MOBILE_AUTH_RETURN_URIS",
+                "https://localhost/,com.learnenglish.app://auth/callback",
             )
         ),
         cookie_name=_env("COOKIE_NAME", "le_session"),
