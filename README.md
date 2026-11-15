@@ -39,6 +39,8 @@ cd backend
 uv run pytest
 ```
 
+CI (`.github/workflows/ci.yml`) runs backend `pytest` and frontend `npm run build` on every push/PR.
+
 ### Auth endpoints
 
 | Method | Path | Behavior |
@@ -98,7 +100,7 @@ Roles persist in SQLite (`DATABASE_PATH`, default `backend/data/learn_english.sq
 | `GET` | `/learner/dialogues/{id}/shadowing` | Exactly 10 shadowing cards |
 | `GET`/`PATCH` | `/learner/profile` | 6-month path + lessons/week + CEFR package |
 | `POST` | `/learner/completions` | Mark karaoke+shadowing complete |
-| `POST` | `/learner/attempts/audio` | Upload LearningAttempt audio (Pha 2 ready) |
+| `POST` | `/learner/attempts/audio` | Upload LearningAttempt audio (browser MediaRecorder → Pha 2 ready) |
 
 TTS defaults to a silent-WAV synthetic engine (CI-safe). Set `USE_EDGE_TTS=true` and install optional `edge-tts` to use the async Edge adapter (falls back to synthetic on missing SDK/network errors).
 

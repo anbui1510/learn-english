@@ -39,7 +39,12 @@ export function LearnerPanel({ onError }: Props) {
   const [cefrPackage, setCefrPackage] = useState<CefrLevel>('B1')
   const [note, setNote] = useState<string | null>(null)
   const [cardIndex, setCardIndex] = useState(0)
+  const [recording, setRecording] = useState(false)
+  const [uploadingAttempt, setUploadingAttempt] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const mediaChunksRef = useRef<Blob[]>([])
+  const mediaStreamRef = useRef<MediaStream | null>(null)
 
   const current = lesson?.playlist[lineIndex] ?? null
   const speakerColor = useMemo(() => {
@@ -182,18 +187,81 @@ export function LearnerPanel({ onError }: Props) {
     }
   }
 
-  async function onRecordPlaceholder() {
+  function stopMediaTracks() {
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop())
+    mediaStreamRef.current = null
+  }
+
+  async function onToggleMicRecord() {
     if (dialogueId == null) return
     onError(null)
+
+    if (recording) {
+      mediaRecorderRef.current?.stop()
+      return
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      onError('Microphone recording is not supported in this browser')
+      return
+    }
+
     try {
-      await uploadAttemptAudio({
-        dialogueId,
-        mode: 'role_play',
-        file: new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/webm' }),
-      })
-      setNote('Attempt audio uploaded (placeholder sample). Pha 2 scoring soon.')
-    } catch (err) {
-      onError(err instanceof Error ? err.message : 'Upload failed')
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      mediaStreamRef.current = stream
+      mediaChunksRef.current = []
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+          ? 'audio/webm'
+          : ''
+      const recorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream)
+      mediaRecorderRef.current = recorder
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) mediaChunksRef.current.push(event.data)
+      }
+      recorder.onerror = () => {
+        setRecording(false)
+        stopMediaTracks()
+        onError('Microphone recording failed')
+      }
+      recorder.onstop = () => {
+        setRecording(false)
+        stopMediaTracks()
+        const blob = new Blob(mediaChunksRef.current, {
+          type: recorder.mimeType || 'audio/webm',
+        })
+        mediaChunksRef.current = []
+        void (async () => {
+          if (blob.size === 0) {
+            onError('No audio captured — try again')
+            return
+          }
+          setUploadingAttempt(true)
+          try {
+            await uploadAttemptAudio({
+              dialogueId,
+              mode: 'role_play',
+              file: blob,
+            })
+            setNote(
+              'Attempt audio saved. Pha 2 pronunciation scoring is not enabled yet.',
+            )
+          } catch (err) {
+            onError(err instanceof Error ? err.message : 'Upload failed')
+          } finally {
+            setUploadingAttempt(false)
+          }
+        })()
+      }
+      recorder.start()
+      setRecording(true)
+      setNote('Recording… tap Stop when finished')
+    } catch {
+      stopMediaTracks()
+      onError('Microphone permission denied or unavailable')
     }
   }
 
@@ -391,13 +459,20 @@ export function LearnerPanel({ onError }: Props) {
               </div>
               <div className="border-l-2 border-orange-500 pl-3 text-sm">
                 <p className="font-medium">Your mic</p>
-                <p className="mt-1 text-slate-500">Pha 2 scoring sắp có</p>
+                <p className="mt-1 text-slate-500">
+                  Hold a turn against the script. Scoring arrives in Pha 2.
+                </p>
                 <button
                   type="button"
-                  className="mt-2 text-sm underline"
-                  onClick={() => void onRecordPlaceholder()}
+                  disabled={uploadingAttempt}
+                  className="mt-2 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+                  onClick={() => void onToggleMicRecord()}
                 >
-                  Upload sample attempt
+                  {recording
+                    ? 'Stop & upload'
+                    : uploadingAttempt
+                      ? 'Uploading…'
+                      : 'Record attempt'}
                 </button>
               </div>
             </div>
