@@ -132,6 +132,18 @@ class EmpathyOut(BaseModel):
     rubric: dict[str, float]
     feedback: str
     disclaimer: str
+    coaching_tip: str | None = None
+    sample_phrase: str | None = None
+
+
+class EmpathySampleIn(BaseModel):
+    text: str = Field(min_length=1, max_length=500)
+
+
+class EmpathySampleOut(BaseModel):
+    text: str
+    audio_url: str
+    duration_ms: int
 
 
 class AttemptOut(BaseModel):
@@ -651,6 +663,34 @@ def replay_word_snippet(
         start_ms=start_ms,
         end_ms=start_ms + duration_ms,
         duration_ms=duration_ms,
+    )
+
+
+@router.post("/empathy/sample-audio", response_model=EmpathySampleOut)
+def synthesize_empathy_sample(
+    body: EmpathySampleIn,
+    user: Annotated[UserRecord, Depends(require_learner_access)],
+) -> EmpathySampleOut:
+    """TTS a coaching sample phrase so learners can hear calm intonation."""
+    del user  # auth gate only
+    settings = get_auth_settings()
+    from app.speech.tts import get_default_tts
+
+    text = body.text.strip()
+    if not text:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Empty sample text"
+        )
+    tts = get_default_tts(use_edge=settings.use_edge_tts)
+    result = tts.synthesize(text=text, speaker="doctor")
+    key = f"audio/empathy-samples/{uuid.uuid4().hex}.wav"
+    stored = get_storage().put(key, result.audio, content_type=result.content_type)
+    return EmpathySampleOut(
+        text=text,
+        audio_url=get_storage().signed_url(
+            stored.key, expires_in=settings.signed_url_ttl_seconds
+        ),
+        duration_ms=result.duration_ms,
     )
 
 

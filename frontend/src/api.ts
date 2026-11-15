@@ -594,6 +594,55 @@ export type EmpathyScore = {
   rubric: Record<string, number>
   feedback: string
   disclaimer: string
+  coaching_tip?: string | null
+  sample_phrase?: string | null
+}
+
+export type SharedCertificate = {
+  title: string
+  module_slug: string
+  cme_points: number
+  rank_at_issue: string
+  share_slug: string
+  disclaimer: string
+  created_at: string
+}
+
+export async function fetchSharedCertificate(
+  shareSlug: string,
+): Promise<SharedCertificate> {
+  const response = await fetch(
+    `${API_BASE}/learner/certificates/${encodeURIComponent(shareSlug)}`,
+  )
+  if (!response.ok) {
+    throw new Error(`Certificate not found (${response.status})`)
+  }
+  return (await response.json()) as SharedCertificate
+}
+
+export async function synthesizeEmpathySample(
+  text: string,
+): Promise<{ text: string; audio_url: string; duration_ms: number }> {
+  const response = await fetch(`${API_BASE}/learner/empathy/sample-audio`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  })
+  if (!response.ok) {
+    throw new Error(`Failed to synthesize sample (${response.status})`)
+  }
+  return (await response.json()) as {
+    text: string
+    audio_url: string
+    duration_ms: number
+  }
+}
+
+export function certificateShareUrl(shareSlug: string): string {
+  const url = new URL(window.location.href)
+  url.searchParams.set('cert', shareSlug)
+  return url.toString()
 }
 
 export type AttemptResult = {

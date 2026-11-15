@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AdminUsers } from './AdminUsers'
+import { CertificateShare } from './CertificateShare'
 import { EditorFacts } from './EditorFacts'
 import { EditorUpload } from './EditorUpload'
 import { LearnerPanel } from './LearnerPanel'
@@ -9,6 +10,11 @@ function App() {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const certSlug = useMemo(
+    () => new URLSearchParams(window.location.search).get('cert'),
+    [],
+  )
+  const [showCert, setShowCert] = useState(Boolean(certSlug))
 
   const handleError = useCallback((message: string | null) => {
     setError(message)
@@ -92,6 +98,18 @@ function App() {
           <p className="text-sm text-red-700" role="alert">
             {error}
           </p>
+        ) : null}
+
+        {showCert && certSlug ? (
+          <CertificateShare
+            shareSlug={certSlug}
+            onClose={() => {
+              setShowCert(false)
+              const url = new URL(window.location.href)
+              url.searchParams.delete('cert')
+              window.history.replaceState({}, '', url.toString())
+            }}
+          />
         ) : null}
 
         {user?.role === 'admin' ? <AdminUsers onError={handleError} /> : null}

@@ -9,6 +9,14 @@ DISCLAIMER = (
 )
 
 
+SAMPLE_PHRASE_LOW = (
+    "I can see this is worrying for you. Let us walk through the plan together."
+)
+SAMPLE_PHRASE_MID = (
+    "Thank you for sharing that. Here is what we can do next, step by step."
+)
+
+
 @dataclass(frozen=True)
 class EmpathyResult:
     engine: str
@@ -16,6 +24,8 @@ class EmpathyResult:
     rubric: dict[str, float]
     feedback: str
     disclaimer: str = DISCLAIMER
+    coaching_tip: str | None = None
+    sample_phrase: str | None = None
 
 
 class EmpathyEngine(Protocol):
@@ -25,6 +35,20 @@ class EmpathyEngine(Protocol):
 def _unit(seed: str) -> float:
     digest = hashlib.sha256(seed.encode("utf-8")).hexdigest()
     return int(digest[:8], 16) / 0xFFFFFFFF
+
+
+def _coaching_for_score(overall: float) -> tuple[str | None, str | None]:
+    if overall >= 75:
+        return None, None
+    if overall >= 55:
+        return (
+            "Try a warmer intonation on the first sentence, then give clinical details.",
+            SAMPLE_PHRASE_MID,
+        )
+    return (
+        "Acknowledge caregiver concern first, then slow your pace before advising.",
+        SAMPLE_PHRASE_LOW,
+    )
 
 
 class SyntheticEmpathyScorer:
@@ -44,6 +68,7 @@ class SyntheticEmpathyScorer:
             feedback = "Add a brief reassuring phrase before clinical details."
         else:
             feedback = "Slow down and acknowledge caregiver concern before advising."
+        tip, sample = _coaching_for_score(overall)
         return EmpathyResult(
             engine="synthetic",
             score=overall,
@@ -53,6 +78,8 @@ class SyntheticEmpathyScorer:
                 "reassurance": reassurance,
             },
             feedback=feedback,
+            coaching_tip=tip,
+            sample_phrase=sample,
         )
 
 
@@ -87,4 +114,6 @@ def empathy_to_dict(result: EmpathyResult) -> dict:
         "rubric": result.rubric,
         "feedback": result.feedback,
         "disclaimer": result.disclaimer,
+        "coaching_tip": result.coaching_tip,
+        "sample_phrase": result.sample_phrase,
     }

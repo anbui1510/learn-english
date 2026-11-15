@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
+  certificateShareUrl,
   completeLesson,
   completeSrsCard,
   fetchLearnerProfile,
@@ -12,6 +13,7 @@ import {
   listLearnerCaseDialogues,
   listPublishedCases,
   patchLearnerProfile,
+  synthesizeEmpathySample,
   uploadAttemptAudio,
   type AttemptScore,
   type CefrLevel,
@@ -365,10 +367,23 @@ export function LearnerPanel({ onError }: Props) {
             streak {progression.streak_days ?? 0}d
           </p>
           {progression.certificates.length > 0 ? (
-            <ul className="mt-1 text-xs text-slate-500">
+            <ul className="mt-1 space-y-1 text-xs text-slate-500">
               {progression.certificates.map((cert) => (
-                <li key={cert.id}>
-                  {cert.title} — share `{cert.share_slug}`
+                <li key={cert.id} className="flex flex-wrap items-center gap-2">
+                  <span>{cert.title}</span>
+                  <button
+                    type="button"
+                    className="underline"
+                    onClick={() => {
+                      const url = certificateShareUrl(cert.share_slug)
+                      void navigator.clipboard.writeText(url).then(
+                        () => setNote(`Copied share link for ${cert.title}`),
+                        () => setNote(url),
+                      )
+                    }}
+                  >
+                    Copy share link
+                  </button>
                 </li>
               ))}
             </ul>
@@ -662,6 +677,47 @@ export function LearnerPanel({ onError }: Props) {
                       Empathy {lastEmpathy.score} ({lastEmpathy.engine})
                     </p>
                     <p className="mt-1 text-slate-600">{lastEmpathy.feedback}</p>
+                    {lastEmpathy.coaching_tip ? (
+                      <div className="mt-2 border-l-2 border-amber-500 pl-2">
+                        <p className="font-medium text-amber-900">
+                          Intonation tip
+                        </p>
+                        <p className="mt-0.5 text-slate-600">
+                          {lastEmpathy.coaching_tip}
+                        </p>
+                        {lastEmpathy.sample_phrase ? (
+                          <>
+                            <p className="mt-1 italic text-slate-700">
+                              “{lastEmpathy.sample_phrase}”
+                            </p>
+                            <button
+                              type="button"
+                              className="mt-1 underline"
+                              onClick={() => {
+                                void (async () => {
+                                  try {
+                                    onError(null)
+                                    const sample = await synthesizeEmpathySample(
+                                      lastEmpathy.sample_phrase!,
+                                    )
+                                    const audio = new Audio(sample.audio_url)
+                                    await audio.play()
+                                  } catch (err) {
+                                    onError(
+                                      err instanceof Error
+                                        ? err.message
+                                        : 'Could not play sample',
+                                    )
+                                  }
+                                })()
+                              }}
+                            >
+                              Play sample tone
+                            </button>
+                          </>
+                        ) : null}
+                      </div>
+                    ) : null}
                     <p className="mt-1 text-xs text-slate-500">
                       {lastEmpathy.disclaimer}
                     </p>

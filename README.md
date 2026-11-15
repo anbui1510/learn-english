@@ -117,6 +117,8 @@ TTS defaults to a silent-WAV synthetic engine (CI-safe). Set `USE_EDGE_TTS=true`
 
 **Pha 2 streak + PA cost log:** editors can require an N-day learning streak to unlock a case; `GET /admin/pa-usage` lists score calls/user/day with optional `PA_COST_PER_SCORE_USD` estimates.
 
+**Pha 2 empathy coaching + cert share:** free-speech empathy below threshold returns `coaching_tip` + `sample_phrase` (play via `POST /learner/empathy/sample-audio`). Certificates expose a public `?cert=` share view and copy-link control.
+
 ### Google OAuth setup (manual verify)
 
 1. Create an OAuth 2.0 **Web application** client in Google Cloud Console.
