@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from datetime import UTC, datetime
 from pathlib import Path
 
 _SCHEMA = """
@@ -25,6 +26,17 @@ CREATE TABLE IF NOT EXISTS role_audit (
     FOREIGN KEY(actor_user_id) REFERENCES users(id)
 );
 
+CREATE TABLE IF NOT EXISTS book_sources (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug TEXT NOT NULL UNIQUE,
+    title TEXT NOT NULL,
+    publisher TEXT,
+    default_isbn TEXT,
+    notes TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS cases (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     owner_user_id INTEGER NOT NULL,
@@ -32,6 +44,7 @@ CREATE TABLE IF NOT EXISTS cases (
     status TEXT NOT NULL CHECK(status IN ('draft', 'published')),
     isbn TEXT,
     edition TEXT,
+    book_source_id INTEGER,
     pdf_object_key TEXT,
     pdf_content_type TEXT,
     pdf_byte_size INTEGER,
@@ -51,7 +64,8 @@ CREATE TABLE IF NOT EXISTS cases (
     updated_at TEXT NOT NULL,
     FOREIGN KEY(owner_user_id) REFERENCES users(id),
     FOREIGN KEY(published_by_user_id) REFERENCES users(id),
-    FOREIGN KEY(unlock_requires_case_id) REFERENCES cases(id)
+    FOREIGN KEY(unlock_requires_case_id) REFERENCES cases(id),
+    FOREIGN KEY(book_source_id) REFERENCES book_sources(id)
 );
 
 CREATE TABLE IF NOT EXISTS facts (
@@ -230,6 +244,7 @@ _CASE_COLUMNS: dict[str, str] = {
     "unlock_rank": "TEXT",
     "unlock_requires_case_id": "INTEGER",
     "unlock_requires_streak_days": "INTEGER NOT NULL DEFAULT 0",
+    "book_source_id": "INTEGER",
 }
 
 
@@ -286,6 +301,29 @@ def _migrate_facts_status_rejected(conn: sqlite3.Connection) -> None:
     )
 
 
+def _seed_book_sources(conn: sqlite3.Connection) -> None:
+    from app.books.repository import DEFAULT_SOURCES
+
+    now = datetime.now(UTC).isoformat()
+    for item in DEFAULT_SOURCES:
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO book_sources (
+                slug, title, publisher, default_isbn, notes, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                item["slug"],
+                item["title"],
+                item["publisher"],
+                item["default_isbn"],
+                item["notes"],
+                now,
+                now,
+            ),
+        )
+
+
 def init_db(conn: sqlite3.Connection) -> None:
     conn.executescript(_SCHEMA)
     existing = {
@@ -301,4 +339,5 @@ def init_db(conn: sqlite3.Connection) -> None:
         if name not in attempt_cols:
             conn.execute(f"ALTER TABLE learning_attempts ADD COLUMN {name} {col_type}")
     _migrate_facts_status_rejected(conn)
+    _seed_book_sources(conn)
     conn.commit()

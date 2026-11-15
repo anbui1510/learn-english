@@ -48,6 +48,7 @@ class CaseCreateIn(BaseModel):
     title: str = Field(min_length=1)
     isbn: str | None = None
     edition: str | None = None
+    book_source_id: int | None = None
 
 
 class CaseOut(BaseModel):
@@ -57,6 +58,8 @@ class CaseOut(BaseModel):
     status: str
     isbn: str | None
     edition: str | None
+    book_source_id: int | None = None
+    book_source_slug: str | None = None
     pdf_object_key: str | None = None
     pdf_byte_size: int | None = None
     extract_status: str = "none"
@@ -72,6 +75,15 @@ class CaseOut(BaseModel):
     unlock_requires_streak_days: int = 0
     created_at: str
     updated_at: str
+
+
+class BookSourceOut(BaseModel):
+    id: int
+    slug: str
+    title: str
+    publisher: str | None = None
+    default_isbn: str | None = None
+    notes: str | None = None
 
 
 class CaseProgressionIn(BaseModel):
@@ -137,6 +149,12 @@ class FactOut(BaseModel):
 
 
 def _case_out(case: CaseRecord) -> CaseOut:
+    from app.books.service import get_book_source_repository
+
+    slug = None
+    if case.book_source_id is not None:
+        source = get_book_source_repository().get(case.book_source_id)
+        slug = source.slug if source else None
     return CaseOut(
         id=case.id,
         owner_user_id=case.owner_user_id,
@@ -144,6 +162,8 @@ def _case_out(case: CaseRecord) -> CaseOut:
         status=case.status,
         isbn=case.isbn,
         edition=case.edition,
+        book_source_id=case.book_source_id,
+        book_source_slug=slug,
         pdf_object_key=case.pdf_object_key,
         pdf_byte_size=case.pdf_byte_size,
         extract_status=case.extract_status,
@@ -213,16 +233,50 @@ def editor_ping(
     return EditorPingOut(status="ok", role=user.role, user_id=user.id)
 
 
+def _require_book_source(book_source_id: int | None) -> int | None:
+    if book_source_id is None:
+        return None
+    from app.books.service import get_book_source_repository
+
+    if get_book_source_repository().get(book_source_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unknown book_source_id",
+        )
+    return book_source_id
+
+
+@router.get("/book-sources", response_model=list[BookSourceOut])
+def list_book_sources_for_editor(
+    _: Annotated[UserRecord, Depends(require_editor)],
+) -> list[BookSourceOut]:
+    from app.books.service import get_book_source_repository
+
+    return [
+        BookSourceOut(
+            id=s.id,
+            slug=s.slug,
+            title=s.title,
+            publisher=s.publisher,
+            default_isbn=s.default_isbn,
+            notes=s.notes,
+        )
+        for s in get_book_source_repository().list_sources()
+    ]
+
+
 @router.post("/cases", response_model=CaseOut, status_code=201)
 def create_case(
     body: CaseCreateIn,
     user: Annotated[UserRecord, Depends(require_editor)],
 ) -> CaseOut:
+    book_source_id = _require_book_source(body.book_source_id)
     case = get_case_repository().create_case(
         owner=user,
         title=body.title,
         isbn=body.isbn,
         edition=body.edition,
+        book_source_id=book_source_id,
     )
     return _case_out(case)
 
@@ -234,6 +288,7 @@ async def upload_case_pdf(
     isbn: Annotated[str, Form(min_length=1)],
     edition: Annotated[str, Form(min_length=1)],
     file: Annotated[UploadFile, File()],
+    book_source_id: Annotated[int | None, Form()] = None,
 ) -> CaseOut:
     settings = get_auth_settings()
     content_type = (file.content_type or "").split(";")[0].strip().lower()
@@ -263,6 +318,7 @@ async def upload_case_pdf(
         title=title,
         isbn=isbn.strip(),
         edition=edition.strip(),
+        book_source_id=_require_book_source(book_source_id),
         pdf_object_key=stored.key,
         pdf_content_type=stored.content_type,
         pdf_byte_size=stored.size,

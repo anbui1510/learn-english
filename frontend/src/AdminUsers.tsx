@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
 import {
   assignRole,
+  createBookSource,
   fetchPaUsage,
+  listAdminBookSources,
   listUsers,
   type AdminUser,
+  type BookSource,
   type PaUsageRow,
   type Role,
 } from './api'
@@ -17,6 +20,9 @@ type Props = {
 export function AdminUsers({ onError }: Props) {
   const [users, setUsers] = useState<AdminUser[]>([])
   const [paUsage, setPaUsage] = useState<PaUsageRow[]>([])
+  const [bookSources, setBookSources] = useState<BookSource[]>([])
+  const [newSlug, setNewSlug] = useState('')
+  const [newTitle, setNewTitle] = useState('')
   const [loading, setLoading] = useState(true)
   const [savingId, setSavingId] = useState<number | null>(null)
 
@@ -24,10 +30,15 @@ export function AdminUsers({ onError }: Props) {
     let cancelled = false
     ;(async () => {
       try {
-        const [rows, usage] = await Promise.all([listUsers(), fetchPaUsage(14)])
+        const [rows, usage, sources] = await Promise.all([
+          listUsers(),
+          fetchPaUsage(14),
+          listAdminBookSources(),
+        ])
         if (!cancelled) {
           setUsers(rows)
           setPaUsage(usage)
+          setBookSources(sources)
           onError(null)
         }
       } catch (err) {
@@ -109,6 +120,77 @@ export function AdminUsers({ onError }: Props) {
           </table>
         </div>
       )}
+
+      <div className="mt-8">
+        <h3 className="text-base font-semibold">Book sources</h3>
+        <p className="mt-1 text-sm text-slate-500">
+          Nelson, Harriet Lane, WHO, and custom guideline libraries.
+        </p>
+        <ul className="mt-2 space-y-1 text-sm">
+          {bookSources.map((source) => (
+            <li key={source.id}>
+              <span className="font-medium">{source.title}</span>
+              <span className="text-slate-500"> ({source.slug})</span>
+              {source.default_isbn ? (
+                <span className="text-slate-500"> · ISBN {source.default_isbn}</span>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+        <form
+          className="mt-3 flex flex-wrap items-end gap-2 text-sm"
+          onSubmit={(e) => {
+            e.preventDefault()
+            void (async () => {
+              try {
+                onError(null)
+                const created = await createBookSource({
+                  slug: newSlug,
+                  title: newTitle,
+                })
+                setBookSources((prev) =>
+                  [...prev, created].sort((a, b) =>
+                    a.title.localeCompare(b.title),
+                  ),
+                )
+                setNewSlug('')
+                setNewTitle('')
+              } catch (err) {
+                onError(
+                  err instanceof Error
+                    ? err.message
+                    : 'Failed to create book source',
+                )
+              }
+            })()
+          }}
+        >
+          <label>
+            Slug
+            <input
+              className="mt-1 block rounded border border-slate-300 px-2 py-1"
+              value={newSlug}
+              onChange={(e) => setNewSlug(e.target.value)}
+              required
+            />
+          </label>
+          <label>
+            Title
+            <input
+              className="mt-1 block rounded border border-slate-300 px-2 py-1"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              required
+            />
+          </label>
+          <button
+            type="submit"
+            className="rounded-md border border-slate-300 px-3 py-1.5 font-medium"
+          >
+            Add source
+          </button>
+        </form>
+      </div>
 
       <div className="mt-8">
         <h3 className="text-base font-semibold">PA usage (14 days)</h3>

@@ -21,6 +21,7 @@ class CaseRecord:
     status: CaseStatus
     isbn: str | None
     edition: str | None
+    book_source_id: int | None
     pdf_object_key: str | None
     pdf_content_type: str | None
     pdf_byte_size: int | None
@@ -55,6 +56,11 @@ def _row_to_case(row: sqlite3.Row) -> CaseRecord:
         status=row["status"],
         isbn=row["isbn"],
         edition=row["edition"],
+        book_source_id=(
+            int(row["book_source_id"])
+            if "book_source_id" in keys and row["book_source_id"] is not None
+            else None
+        ),
         pdf_object_key=row["pdf_object_key"] if "pdf_object_key" in keys else None,
         pdf_content_type=(
             row["pdf_content_type"] if "pdf_content_type" in keys else None
@@ -111,6 +117,7 @@ class CaseRepository:
         title: str,
         isbn: str | None = None,
         edition: str | None = None,
+        book_source_id: int | None = None,
         pdf_object_key: str | None = None,
         pdf_content_type: str | None = None,
         pdf_byte_size: int | None = None,
@@ -124,17 +131,18 @@ class CaseRepository:
             cur = conn.execute(
                 """
                 INSERT INTO cases (
-                    owner_user_id, title, status, isbn, edition,
+                    owner_user_id, title, status, isbn, edition, book_source_id,
                     pdf_object_key, pdf_content_type, pdf_byte_size,
                     extract_status, created_at, updated_at
                 )
-                VALUES (?, ?, 'draft', ?, ?, ?, ?, ?, 'none', ?, ?)
+                VALUES (?, ?, 'draft', ?, ?, ?, ?, ?, ?, 'none', ?, ?)
                 """,
                 (
                     owner.id,
                     title_clean,
                     isbn,
                     edition,
+                    book_source_id,
                     pdf_object_key,
                     pdf_content_type,
                     pdf_byte_size,

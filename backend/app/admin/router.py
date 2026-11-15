@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -108,6 +109,114 @@ def pa_usage_report(
         )
         for row in rows
     ]
+
+
+class BookSourceOut(BaseModel):
+    id: int
+    slug: str
+    title: str
+    publisher: str | None = None
+    default_isbn: str | None = None
+    notes: str | None = None
+    created_at: str
+    updated_at: str
+
+
+class BookSourceCreateIn(BaseModel):
+    slug: str = Field(min_length=1, max_length=80)
+    title: str = Field(min_length=1, max_length=200)
+    publisher: str | None = None
+    default_isbn: str | None = None
+    notes: str | None = None
+
+
+class BookSourcePatchIn(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    publisher: str | None = None
+    default_isbn: str | None = None
+    notes: str | None = None
+    clear_publisher: bool = False
+    clear_default_isbn: bool = False
+    clear_notes: bool = False
+
+
+def _book_out(source) -> BookSourceOut:
+    return BookSourceOut(
+        id=source.id,
+        slug=source.slug,
+        title=source.title,
+        publisher=source.publisher,
+        default_isbn=source.default_isbn,
+        notes=source.notes,
+        created_at=source.created_at,
+        updated_at=source.updated_at,
+    )
+
+
+@router.get("/book-sources", response_model=list[BookSourceOut])
+def list_book_sources(
+    _: Annotated[UserRecord, Depends(require_admin)],
+) -> list[BookSourceOut]:
+    from app.books.service import get_book_source_repository
+
+    return [_book_out(s) for s in get_book_source_repository().list_sources()]
+
+
+@router.post("/book-sources", response_model=BookSourceOut, status_code=201)
+def create_book_source(
+    body: BookSourceCreateIn,
+    _: Annotated[UserRecord, Depends(require_admin)],
+) -> BookSourceOut:
+    from app.books.service import get_book_source_repository
+
+    try:
+        created = get_book_source_repository().create(
+            slug=body.slug,
+            title=body.title,
+            publisher=body.publisher,
+            default_isbn=body.default_isbn,
+            notes=body.notes,
+        )
+    except sqlite3.IntegrityError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Book source slug already exists",
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
+    return _book_out(created)
+
+
+@router.patch("/book-sources/{source_id}", response_model=BookSourceOut)
+def patch_book_source(
+    source_id: int,
+    body: BookSourcePatchIn,
+    _: Annotated[UserRecord, Depends(require_admin)],
+) -> BookSourceOut:
+    from app.books.service import get_book_source_repository
+
+    try:
+        updated = get_book_source_repository().update(
+            source_id,
+            title=body.title,
+            publisher=body.publisher,
+            default_isbn=body.default_isbn,
+            notes=body.notes,
+            clear_publisher=body.clear_publisher,
+            clear_default_isbn=body.clear_default_isbn,
+            clear_notes=body.clear_notes,
+        )
+    except KeyError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Book source not found"
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
+    return _book_out(updated)
 
 
 @router.get("/users/{user_id}/role-audit", response_model=list[RoleAuditOut])

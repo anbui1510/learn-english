@@ -121,6 +121,8 @@ TTS defaults to a silent-WAV synthetic engine (CI-safe). Set `USE_EDGE_TTS=true`
 
 **Pha 3 presentation sessions:** editors can generate `session_kind=presentation` (~10 min CME talk) with fact-bound expanded lines + per-line TTS chunking; learners see a progress bar on long playlists.
 
+**Pha 3 book sources:** `book_sources` seeds Nelson / Harriet Lane / WHO; admins CRUD via `/admin/book-sources`; editors tag cases on upload (`book_source_id`) while facts keep per-case ISBN metadata.
+
 ### Google OAuth setup (manual verify)
 
 1. Create an OAuth 2.0 **Web application** client in Google Cloud Console.

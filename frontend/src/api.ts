@@ -105,6 +105,8 @@ export type CaseDraft = {
   status: string
   isbn: string | null
   edition: string | null
+  book_source_id?: number | null
+  book_source_slug?: string | null
   pdf_object_key: string | null
   pdf_byte_size: number | null
   extract_status: ExtractStatus
@@ -116,6 +118,54 @@ export type CaseDraft = {
   unlock_rank?: string | null
   unlock_requires_case_id?: number | null
   unlock_requires_streak_days?: number
+}
+
+export type BookSource = {
+  id: number
+  slug: string
+  title: string
+  publisher?: string | null
+  default_isbn?: string | null
+  notes?: string | null
+}
+
+export async function listAdminBookSources(): Promise<BookSource[]> {
+  const response = await fetch(`${API_BASE}/admin/book-sources`, {
+    credentials: 'include',
+  })
+  if (!response.ok) {
+    throw new Error(`Failed to list book sources (${response.status})`)
+  }
+  return (await response.json()) as BookSource[]
+}
+
+export async function createBookSource(input: {
+  slug: string
+  title: string
+  publisher?: string
+  default_isbn?: string
+  notes?: string
+}): Promise<BookSource> {
+  const response = await fetch(`${API_BASE}/admin/book-sources`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!response.ok) {
+    throw new Error(`Failed to create book source (${response.status})`)
+  }
+  return (await response.json()) as BookSource
+}
+
+export async function listEditorBookSources(): Promise<BookSource[]> {
+  const response = await fetch(`${API_BASE}/editor/book-sources`, {
+    credentials: 'include',
+  })
+  if (!response.ok) {
+    throw new Error(`Failed to list book sources (${response.status})`)
+  }
+  return (await response.json()) as BookSource[]
 }
 
 export type ClinicalFact = {
@@ -136,12 +186,16 @@ export async function uploadCasePdf(input: {
   isbn: string
   edition: string
   file: File
+  bookSourceId?: number | null
 }): Promise<CaseDraft> {
   const body = new FormData()
   body.set('title', input.title)
   body.set('isbn', input.isbn)
   body.set('edition', input.edition)
   body.set('file', input.file)
+  if (input.bookSourceId != null) {
+    body.set('book_source_id', String(input.bookSourceId))
+  }
   const response = await fetch(`${API_BASE}/editor/cases/upload`, {
     method: 'POST',
     credentials: 'include',
