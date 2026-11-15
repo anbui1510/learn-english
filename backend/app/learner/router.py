@@ -32,6 +32,7 @@ from app.learner.service import (
     get_srs_repository,
 )
 from app.learner.shadowing import build_shadowing_cards
+from app.learner.skill_tree import build_skill_tree, tree_to_dict
 from app.speech.service import get_utterance_repository
 from app.speech.synthesize import synthesize_dialogue
 from app.storage.factory import get_storage
@@ -245,6 +246,35 @@ def _line_reference(dialogue, line_index: int) -> tuple[str, list[int] | None]:
     return text, stress
 
 
+def _cases_by_module() -> dict[str, list[int]]:
+    grouped: dict[str, list[int]] = {}
+    for case in get_case_repository().list_published():
+        if not case.module_slug:
+            continue
+        grouped.setdefault(case.module_slug, []).append(case.id)
+    return grouped
+
+
+def _module_lock_map(user_id: int) -> dict[str, tuple[bool, str | None]]:
+    progress = get_progression_repository()
+    completed = progress.completed_case_ids(user_id)
+    certified = {c.module_slug for c in progress.list_certificates(user_id)}
+    nodes = build_skill_tree(
+        cases_by_module=_cases_by_module(),
+        completed_case_ids=completed,
+        certified_modules=certified,
+    )
+
+    def walk(items) -> dict[str, tuple[bool, str | None]]:
+        mapping: dict[str, tuple[bool, str | None]] = {}
+        for node in items:
+            mapping[node.slug] = (node.unlocked, node.unlock_reason)
+            mapping.update(walk(node.children))
+        return mapping
+
+    return walk(nodes)
+
+
 @router.get("/cases", response_model=list[PublishedCaseOut])
 def list_published_cases(
     user: Annotated[UserRecord, Depends(require_learner_access)],
@@ -253,6 +283,7 @@ def list_published_cases(
     completed = progress.completed_case_ids(user.id)
     cme_total = progress.cme_total(user.id)
     rank_id, _ = rank_for_completions(len(completed))
+    module_locks = _module_lock_map(user.id)
     out: list[PublishedCaseOut] = []
     for case in get_case_repository().list_published():
         decision = evaluate_unlock(
@@ -261,6 +292,13 @@ def list_published_cases(
             cme_total=cme_total,
             rank_id=rank_id,
         )
+        unlocked = decision.unlocked
+        reason = decision.reason
+        if case.module_slug and case.module_slug in module_locks:
+            mod_ok, mod_reason = module_locks[case.module_slug]
+            if not mod_ok:
+                unlocked = False
+                reason = mod_reason
         out.append(
             PublishedCaseOut(
                 id=case.id,
@@ -269,8 +307,8 @@ def list_published_cases(
                 edition=case.edition,
                 published_at=case.published_at,
                 module_slug=case.module_slug,
-                unlocked=decision.unlocked,
-                unlock_reason=decision.reason,
+                unlocked=unlocked,
+                unlock_reason=reason,
             )
         )
     return out
@@ -514,6 +552,84 @@ def get_progression(
 ) -> dict[str, Any]:
     return progression_snapshot(
         user_id=user.id, repo=get_progression_repository()
+    )
+
+
+@router.get("/skill-tree")
+def get_skill_tree(
+    user: Annotated[UserRecord, Depends(require_learner_access)],
+) -> dict[str, Any]:
+    progress = get_progression_repository()
+    completed = progress.completed_case_ids(user.id)
+    certified = {c.module_slug for c in progress.list_certificates(user.id)}
+    nodes = build_skill_tree(
+        cases_by_module=_cases_by_module(),
+        completed_case_ids=completed,
+        certified_modules=certified,
+    )
+    return {"nodes": tree_to_dict(nodes)}
+
+
+class WordReplayOut(BaseModel):
+    dialogue_id: int
+    line_index: int
+    word: str
+    audio_url: str
+    start_ms: int
+    end_ms: int
+    duration_ms: int
+
+
+@router.get(
+    "/dialogues/{dialogue_id}/lines/{line_index}/words/{word}/replay",
+    response_model=WordReplayOut,
+)
+def replay_word_snippet(
+    dialogue_id: int,
+    line_index: int,
+    word: str,
+    user: Annotated[UserRecord, Depends(require_learner_access)],
+) -> WordReplayOut:
+    """Return AI TTS audio URL + word window for red-word tap replay."""
+    settings = get_auth_settings()
+    case, dialogue = _require_published_dialogue(dialogue_id)
+    _assert_unlocked(user, case)
+    utterances = get_utterance_repository().list_for_dialogue(dialogue_id)
+    if not utterances:
+        utterances = synthesize_dialogue(
+            dialogue=dialogue,
+            utterances=get_utterance_repository(),
+            storage=get_storage(),
+        )
+    match = next((u for u in utterances if u.line_index == line_index), None)
+    if match is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Line audio not found"
+        )
+    needle = word.strip().lower().strip(".,!?;:\"'")
+    stamp = None
+    for item in match.timestamps:
+        token = str(item.get("word") or "").strip().lower().strip(".,!?;:\"'")
+        if token == needle:
+            stamp = item
+            break
+    if stamp is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Word timestamp not found on this line",
+        )
+    start_ms = int(stamp.get("offset_ms") or 0)
+    duration_ms = max(int(stamp.get("duration_ms") or 200), 120)
+    return WordReplayOut(
+        dialogue_id=dialogue_id,
+        line_index=line_index,
+        word=str(stamp.get("word") or word),
+        audio_url=get_storage().signed_url(
+            match.object_key, expires_in=settings.signed_url_ttl_seconds
+        ),
+        start_ms=start_ms,
+        end_ms=start_ms + duration_ms,
+        duration_ms=duration_ms,
     )
 
 

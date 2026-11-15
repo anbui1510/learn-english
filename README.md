@@ -113,6 +113,8 @@ TTS defaults to a silent-WAV synthetic engine (CI-safe). Set `USE_EDGE_TTS=true`
 
 **Pha 2 progression:** lesson completion awards virtual CME (+ role-play PA bonus). Rank ladder Medical Student → Chief of Staff. Editors set `module_slug` / unlock CME / unlock rank / prerequisite case (cycle-safe). Module CME threshold issues a shareable digital certificate with disclaimer.
 
+**Pha 2 skill tree + replay:** `GET /learner/skill-tree` exposes Nhi đại cương → Tim mạch nhi locks; cases inherit module locks. Tap a red PA word to `.../words/{word}/replay` the AI TTS snippet.
+
 ### Google OAuth setup (manual verify)
 
 1. Create an OAuth 2.0 **Web application** client in Google Cloud Console.

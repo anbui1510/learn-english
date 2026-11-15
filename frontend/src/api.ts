@@ -486,6 +486,54 @@ export async function fetchProgression(): Promise<Progression> {
   return (await response.json()) as Progression
 }
 
+export type SkillTreeNode = {
+  slug: string
+  title: string
+  parent_slug: string | null
+  unlocked: boolean
+  completed: boolean
+  unlock_reason?: string | null
+  case_ids: number[]
+  children: SkillTreeNode[]
+}
+
+export async function fetchSkillTree(): Promise<SkillTreeNode[]> {
+  const response = await fetch(`${API_BASE}/learner/skill-tree`, {
+    credentials: 'include',
+  })
+  if (!response.ok) {
+    throw new Error(`Failed to load skill tree (${response.status})`)
+  }
+  const body = (await response.json()) as { nodes: SkillTreeNode[] }
+  return body.nodes
+}
+
+export type WordReplay = {
+  dialogue_id: number
+  line_index: number
+  word: string
+  audio_url: string
+  start_ms: number
+  end_ms: number
+  duration_ms: number
+}
+
+export async function fetchWordReplay(input: {
+  dialogueId: number
+  lineIndex: number
+  word: string
+}): Promise<WordReplay> {
+  const word = encodeURIComponent(input.word)
+  const response = await fetch(
+    `${API_BASE}/learner/dialogues/${input.dialogueId}/lines/${input.lineIndex}/words/${word}/replay`,
+    { credentials: 'include' },
+  )
+  if (!response.ok) {
+    throw new Error(`Word replay failed (${response.status})`)
+  }
+  return (await response.json()) as WordReplay
+}
+
 export async function patchCaseProgression(
   caseId: number,
   body: {

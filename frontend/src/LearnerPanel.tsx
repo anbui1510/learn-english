@@ -6,7 +6,9 @@ import {
   fetchLesson,
   fetchProgression,
   fetchShadowing,
+  fetchSkillTree,
   fetchSrsQueue,
+  fetchWordReplay,
   listLearnerCaseDialogues,
   listPublishedCases,
   patchLearnerProfile,
@@ -18,6 +20,7 @@ import {
   type Progression,
   type PublishedCase,
   type ShadowingCard,
+  type SkillTreeNode,
   type SrsCard,
 } from './api'
 
@@ -55,6 +58,8 @@ export function LearnerPanel({ onError }: Props) {
   )
   const [srsCards, setSrsCards] = useState<SrsCard[]>([])
   const [progression, setProgression] = useState<Progression | null>(null)
+  const [skillTree, setSkillTree] = useState<SkillTreeNode[]>([])
+  const replayAudioRef = useRef<HTMLAudioElement | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const mediaChunksRef = useRef<Blob[]>([])
@@ -78,11 +83,12 @@ export function LearnerPanel({ onError }: Props) {
     let cancelled = false
     ;(async () => {
       try {
-        const [listed, profile, queue, prog] = await Promise.all([
+        const [listed, profile, queue, prog, tree] = await Promise.all([
           listPublishedCases(),
           fetchLearnerProfile(),
           fetchSrsQueue(1),
           fetchProgression(),
+          fetchSkillTree(),
         ])
         if (cancelled) return
         setCases(listed)
@@ -90,6 +96,7 @@ export function LearnerPanel({ onError }: Props) {
         setCefrPackage(profile.cefr_package)
         setSrsCards(queue)
         setProgression(prog)
+        setSkillTree(tree)
         const firstOpen = listed.find((c) => c.unlocked !== false)
         if (firstOpen) setCaseId(firstOpen.id)
       } catch (err) {
@@ -197,6 +204,36 @@ export function LearnerPanel({ onError }: Props) {
       )
     } catch (err) {
       onError(err instanceof Error ? err.message : 'Failed to save profile')
+    }
+  }
+
+  async function onReplayRedWord(word: string) {
+    if (dialogueId == null) return
+    onError(null)
+    try {
+      const snippet = await fetchWordReplay({
+        dialogueId,
+        lineIndex,
+        word,
+      })
+      const audio = replayAudioRef.current ?? new Audio()
+      replayAudioRef.current = audio
+      audio.pause()
+      audio.src = snippet.audio_url
+      const startSec = snippet.start_ms / 1000
+      const endSec = snippet.end_ms / 1000
+      const onTime = () => {
+        if (audio.currentTime >= endSec) {
+          audio.pause()
+          audio.removeEventListener('timeupdate', onTime)
+        }
+      }
+      audio.addEventListener('timeupdate', onTime)
+      audio.currentTime = startSec
+      await audio.play()
+      setNote(`Replaying AI sample: “${snippet.word}”`)
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Replay failed')
     }
   }
 
@@ -334,6 +371,22 @@ export function LearnerPanel({ onError }: Props) {
               ))}
             </ul>
           ) : null}
+        </div>
+      ) : null}
+
+      {skillTree.length > 0 ? (
+        <div className="mt-4 border-t border-slate-200 pt-4">
+          <h3 className="text-base font-semibold">Specialty skill tree</h3>
+          <p className="mt-1 text-sm text-slate-500">
+            Finish Nhi đại cương before Tim mạch nhi unlocks.
+          </p>
+          <ul className="mt-3 space-y-2 text-sm">
+            {skillTree.map((node) => (
+              <li key={node.slug}>
+                <SkillNodeView node={node} />
+              </li>
+            ))}
+          </ul>
         </div>
       ) : null}
 
@@ -569,23 +622,35 @@ export function LearnerPanel({ onError }: Props) {
                       {lastScore.stress_hint
                         ? ` · ${lastScore.stress_hint}`
                         : ''}
+                      {' · '}
+                      tap a red word to hear the AI sample
                     </p>
                     <p className="flex flex-wrap gap-x-1 gap-y-1 text-sm leading-relaxed">
-                      {lastScore.words.map((word, index) => (
-                        <span
-                          key={`${word.word}-${index}`}
-                          className={
-                            word.band === 'green'
-                              ? 'text-emerald-700'
-                              : word.band === 'yellow'
-                                ? 'text-amber-600'
-                                : 'text-red-600'
-                          }
-                          title={`${word.accuracy}`}
-                        >
-                          {word.word}
-                        </span>
-                      ))}
+                      {lastScore.words.map((word, index) =>
+                        word.band === 'red' ? (
+                          <button
+                            key={`${word.word}-${index}`}
+                            type="button"
+                            className="text-red-600 underline"
+                            title={`${word.accuracy} — replay AI`}
+                            onClick={() => void onReplayRedWord(word.word)}
+                          >
+                            {word.word}
+                          </button>
+                        ) : (
+                          <span
+                            key={`${word.word}-${index}`}
+                            className={
+                              word.band === 'green'
+                                ? 'text-emerald-700'
+                                : 'text-amber-600'
+                            }
+                            title={`${word.accuracy}`}
+                          >
+                            {word.word}
+                          </span>
+                        ),
+                      )}
                     </p>
                   </div>
                 ) : null}
@@ -668,5 +733,39 @@ export function LearnerPanel({ onError }: Props) {
 
       {note ? <p className="mt-3 text-sm text-slate-600">{note}</p> : null}
     </section>
+  )
+}
+
+function SkillNodeView({ node, depth = 0 }: { node: SkillTreeNode; depth?: number }) {
+  return (
+    <div style={{ marginLeft: depth * 12 }}>
+      <p
+        className={
+          node.unlocked
+            ? node.completed
+              ? 'text-emerald-700'
+              : 'text-slate-800'
+            : 'text-slate-400'
+        }
+      >
+        {node.title}
+        {node.completed ? ' ✓' : ''}
+        {!node.unlocked && node.unlock_reason
+          ? ` — ${node.unlock_reason}`
+          : ''}
+        {node.case_ids.length > 0
+          ? ` (${node.case_ids.length} case${node.case_ids.length > 1 ? 's' : ''})`
+          : ''}
+      </p>
+      {node.children.length > 0 ? (
+        <ul className="mt-1 space-y-1">
+          {node.children.map((child) => (
+            <li key={child.slug}>
+              <SkillNodeView node={child} depth={depth + 1} />
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   )
 }
