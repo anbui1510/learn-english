@@ -4,7 +4,7 @@ import { CertificateShare } from './CertificateShare'
 import { EditorFacts } from './EditorFacts'
 import { EditorUpload } from './EditorUpload'
 import { LearnerPanel } from './LearnerPanel'
-import { fetchMe, loginUrl, logout, type AuthUser } from './api'
+import { fetchMe, loginUrl, logout, type AuthUser, type CaseDraft } from './api'
 import { OfflineBanner } from './OfflineBanner'
 import {
   isNativePlatform,
@@ -21,10 +21,15 @@ function App() {
     [],
   )
   const [showCert, setShowCert] = useState(Boolean(certSlug))
+  const [editorCaseId, setEditorCaseId] = useState<number | null>(null)
   const native = useMemo(() => isNativePlatform(), [])
 
   const handleError = useCallback((message: string | null) => {
     setError(message)
+  }, [])
+
+  const handleCaseUploaded = useCallback((draft: CaseDraft) => {
+    setEditorCaseId(draft.id)
   }, [])
 
   const refreshSession = useCallback(async () => {
@@ -166,8 +171,14 @@ function App() {
         {user?.role === 'admin' ? <AdminUsers onError={handleError} /> : null}
         {user?.role === 'editor' || user?.role === 'admin' ? (
           <>
-            <EditorUpload onError={handleError} />
-            <EditorFacts onError={handleError} />
+            <EditorUpload
+              onError={handleError}
+              onCaseUploaded={handleCaseUploaded}
+            />
+            <EditorFacts
+              onError={handleError}
+              focusCaseId={editorCaseId}
+            />
           </>
         ) : null}
         {user ? <LearnerPanel onError={handleError} /> : null}

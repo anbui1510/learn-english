@@ -19,6 +19,8 @@ import {
 
 type Props = {
   onError: (message: string | null) => void
+  /** When set after upload, refresh the case list and select this id. */
+  focusCaseId?: number | null
 }
 
 const ALL_CONTEXTS: DialogueContext[] = [
@@ -41,7 +43,7 @@ async function waitForExtract(caseId: number): Promise<CaseDraft> {
   return getCase(caseId)
 }
 
-export function EditorFacts({ onError }: Props) {
+export function EditorFacts({ onError, focusCaseId = null }: Props) {
   const [cases, setCases] = useState<CaseDraft[]>([])
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [facts, setFacts] = useState<ClinicalFact[]>([])
@@ -106,6 +108,36 @@ export function EditorFacts({ onError }: Props) {
       cancelled = true
     }
   }, [onError])
+
+  // After a successful upload, reload cases and select the new draft.
+  useEffect(() => {
+    if (focusCaseId == null) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        await refreshCases()
+        if (!cancelled) {
+          setSelectedId(focusCaseId)
+          const draft = await getCase(focusCaseId)
+          if (!cancelled) {
+            setCases((prev) => {
+              const others = prev.filter((c) => c.id !== draft.id)
+              return [draft, ...others]
+            })
+          }
+        }
+      } catch (err) {
+        if (!cancelled) {
+          onError(
+            err instanceof Error ? err.message : 'Failed to open uploaded case',
+          )
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [focusCaseId, onError, refreshCases])
 
   useEffect(() => {
     if (selectedId == null) {
@@ -278,9 +310,18 @@ export function EditorFacts({ onError }: Props) {
       </p>
 
       {cases.length === 0 ? (
-        <p className="mt-4 text-sm text-slate-500">
-          Upload a PDF case first to enable extraction.
-        </p>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <p className="text-sm text-slate-500">
+            Upload a PDF case first to enable extraction.
+          </p>
+          <button
+            type="button"
+            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100"
+            onClick={() => void refreshCases().catch((err) => onError(err instanceof Error ? err.message : 'Refresh failed'))}
+          >
+            Refresh cases
+          </button>
+        </div>
       ) : (
         <div className="mt-4 flex flex-col gap-3">
           <label className="text-sm">
