@@ -1,8 +1,11 @@
 import { Capacitor } from '@capacitor/core'
 import {
+  createPkcePair,
   exchangeAuthCode,
   loginUrl,
   MOBILE_AUTH_RETURN_URI,
+  storePkceVerifier,
+  takePkceVerifier,
 } from './api'
 
 /** True when running inside a Capacitor native shell (not plain browser). */
@@ -49,10 +52,13 @@ export async function bootstrapNativeShell(): Promise<void> {
 
 /**
  * Open Google OAuth in a Custom Tab / SFSafariViewController, returning via
- * deep link `com.learnenglish.app://auth/callback?code=…`.
+ * deep link `com.learnenglish.app://auth/callback?code=…` (code only; PKCE
+ * verifier stays in sessionStorage).
  */
 export async function startNativeGoogleLogin(): Promise<void> {
-  const url = loginUrl(MOBILE_AUTH_RETURN_URI)
+  const { verifier, challenge } = await createPkcePair()
+  storePkceVerifier(verifier)
+  const url = loginUrl(MOBILE_AUTH_RETURN_URI, challenge)
   if (!isNativePlatform()) {
     window.location.assign(url)
     return
@@ -61,7 +67,22 @@ export async function startNativeGoogleLogin(): Promise<void> {
   await Browser.open({ url, presentationStyle: 'popover' })
 }
 
+/** Accept only the exact OAuth callback deep link (blocks open-redirect style URLs). */
+export function isTrustedAuthCallback(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    const protocol = parsed.protocol.replace(/:$/, '')
+    if (protocol !== 'com.learnenglish.app') return false
+    if (parsed.hostname !== 'auth') return false
+    if (parsed.pathname !== '/callback') return false
+    return true
+  } catch {
+    return /^com\.learnenglish\.app:\/\/auth\/callback(?:\?|#|$)/.test(url)
+  }
+}
+
 function codeFromDeepLink(url: string): string | null {
+  if (!isTrustedAuthCallback(url)) return null
   try {
     const parsed = new URL(url)
     return parsed.searchParams.get('code')
@@ -72,8 +93,8 @@ function codeFromDeepLink(url: string): string | null {
 }
 
 /**
- * Listen for OAuth deep-link return; exchange one-time code for session cookie.
- * Call once at app start; invoke `onSession` after a successful exchange.
+ * Listen for OAuth deep-link return; exchange one-time code + PKCE verifier
+ * for session cookie. Call once at app start; invoke `onSession` after success.
  */
 export async function listenForAuthDeepLink(
   onSession: () => void | Promise<void>,
@@ -85,15 +106,19 @@ export async function listenForAuthDeepLink(
   const { Browser } = await import('@capacitor/browser')
 
   const handle = async (url: string) => {
-    if (!url.startsWith('com.learnenglish.app://')) return
+    if (!isTrustedAuthCallback(url)) return
     const code = codeFromDeepLink(url)
     if (!code) return
+    const verifier = takePkceVerifier()
+    if (!verifier) {
+      throw new Error('Missing PKCE verifier for auth exchange')
+    }
     try {
       await Browser.close()
     } catch {
       // Browser may already be closed.
     }
-    await exchangeAuthCode(code)
+    await exchangeAuthCode(code, verifier)
     await onSession()
   }
 

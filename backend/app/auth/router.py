@@ -17,6 +17,7 @@ from app.auth.mobile_return import (
     append_query_param,
     consume_auth_code,
     is_allowed_return_to,
+    is_valid_code_challenge,
     issue_auth_code,
     needs_auth_code_handoff,
     resolve_post_auth_redirect,
@@ -29,16 +30,19 @@ from app.users.service import bootstrap_admin_emails, get_user_repository
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 _SESSION_RETURN_KEY = "oauth_return_to"
+_SESSION_CHALLENGE_KEY = "oauth_code_challenge"
 
 
 class ExchangeBody(BaseModel):
     code: str = Field(min_length=8, max_length=256)
+    code_verifier: str | None = Field(default=None, min_length=43, max_length=128)
 
 
 @router.get("/google/login")
 async def google_login(
     request: Request,
     return_to: str | None = None,
+    code_challenge: str | None = None,
 ) -> RedirectResponse:
     settings = get_auth_settings()
     if not ensure_google_client(settings):
@@ -47,9 +51,21 @@ async def google_login(
             detail="Google OAuth is not configured",
         )
     if return_to and is_allowed_return_to(settings, return_to):
-        request.session[_SESSION_RETURN_KEY] = return_to.strip()
+        cleaned = return_to.strip()
+        request.session[_SESSION_RETURN_KEY] = cleaned
+        # Custom-scheme handoff must use PKCE so a stolen deep-link code is useless.
+        if needs_auth_code_handoff(cleaned):
+            if not is_valid_code_challenge(code_challenge):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="code_challenge (S256) is required for mobile return_to",
+                )
+            request.session[_SESSION_CHALLENGE_KEY] = code_challenge
+        else:
+            request.session.pop(_SESSION_CHALLENGE_KEY, None)
     else:
         request.session.pop(_SESSION_RETURN_KEY, None)
+        request.session.pop(_SESSION_CHALLENGE_KEY, None)
     return await oauth.google.authorize_redirect(request, settings.google_redirect_uri)
 
 
@@ -93,10 +109,17 @@ async def google_callback(request: Request) -> RedirectResponse:
         role=user.role,
     )
     return_to = request.session.pop(_SESSION_RETURN_KEY, None)
+    code_challenge = request.session.pop(_SESSION_CHALLENGE_KEY, None)
     redirect_url = resolve_post_auth_redirect(settings, return_to)
 
     if needs_auth_code_handoff(redirect_url):
-        code = issue_auth_code(session_jwt)
+        if not is_valid_code_challenge(code_challenge):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Missing PKCE challenge for mobile auth handoff",
+            )
+        # Deep link carries only the one-time code — never JWT, verifier, or secrets.
+        code = issue_auth_code(session_jwt, code_challenge=code_challenge)
         redirect_url = append_query_param(redirect_url, "code", code)
         return RedirectResponse(url=redirect_url, status_code=302)
 
@@ -108,7 +131,10 @@ async def google_callback(request: Request) -> RedirectResponse:
 @router.post("/exchange")
 async def exchange_auth_code(body: ExchangeBody, response: Response) -> dict[str, str]:
     settings = get_auth_settings()
-    session_jwt = consume_auth_code(body.code.strip())
+    session_jwt = consume_auth_code(
+        body.code.strip(),
+        code_verifier=body.code_verifier.strip() if body.code_verifier else None,
+    )
     if not session_jwt:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
