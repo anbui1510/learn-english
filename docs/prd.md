@@ -256,7 +256,7 @@ Web app giúp **bác sĩ nội trú** luyện tiếng Anh giao tiếp y khoa t�
 | ID | User Story | Acceptance Criteria |
 |----|------------|---------------------|
 | US-G2-030 | Là **hệ thống**, cụm **sai/ấp úng** tự vào **「Thẻ cần ôn lại」** ngày **T+1**, để lặp có khoảng cách. | Cron/scheduler; dedupe phrase. |
-| US-G2-031 | Là **learner**, tôi thấy hàng đợi ôn trên dashboard, để ưu tiên yếu điểm. | Mark done sau luyện; mở rộng SM-2 optional sau. |
+| US-G2-031 | Là **learner**, tôi thấy hàng đợi ôn trên dashboard, để ưu tiên yếu điểm. | Mark done advances SM-2 lite intervals (1→3→7→14); `repetition` on card; PA miss resets. |
 
 ---
 

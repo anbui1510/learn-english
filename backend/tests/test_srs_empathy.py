@@ -48,8 +48,13 @@ def test_srs_enqueue_and_due(tmp_path) -> None:
     assert len(due) == 1
     assert due[0].phrase == "wheezing"
     done = repo.mark_done(card_id=due[0].id, user_id=admin.id)
-    assert done is not None and done.done_at
-    assert repo.list_due(admin.id, on_or_before=tomorrow) == []
+    assert done is not None
+    assert done.repetition == 1
+    assert done.done_at is None
+    # First success schedules +1 day; still due within T+1 horizon.
+    assert done.due_at == tomorrow
+    # Not due today after review.
+    assert repo.list_due(admin.id, on_or_before=date.today().isoformat()) == []
 
 
 def test_free_speech_empathy_and_srs_api(
@@ -88,8 +93,12 @@ def test_free_speech_empathy_and_srs_api(
     assert queue.status_code == 200
     cards = queue.json()
     assert len(cards) >= 1
-    before = len(cards)
-    done = client.post(f"/learner/srs/{cards[0]['id']}/done")
+    card_id = cards[0]["id"]
+    done = client.post(f"/learner/srs/{card_id}/done")
     assert done.status_code == 200
-    after = client.get("/learner/srs/queue?horizon_days=1").json()
-    assert len(after) == before - 1
+    body = done.json()
+    assert body["repetition"] == 1
+    assert body["due_at"] == (date.today() + timedelta(days=1)).isoformat()
+    # Reviewed card is scheduled ahead; not due "today" (horizon 0).
+    today_queue = client.get("/learner/srs/queue?horizon_days=0").json()
+    assert all(c["id"] != card_id for c in today_queue)

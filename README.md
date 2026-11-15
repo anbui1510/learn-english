@@ -103,14 +103,14 @@ Roles persist in SQLite (`DATABASE_PATH`, default `backend/data/learn_english.sq
 | `POST` | `/learner/completions` | Mark karaoke+shadowing complete |
 | `POST` | `/learner/attempts/audio` | Upload LearningAttempt + optional PA score (synthetic default) |
 | `POST` | `/learner/attempts/{id}/score` | Re-score an attempt against a dialogue line (rate-limited) |
-| `GET` | `/learner/srs/queue` | Weak-phrase SRS cards due through T+1 (`horizon_days`) |
-| `POST` | `/learner/srs/{id}/done` | Mark an SRS card complete |
+| `GET` | `/learner/srs/queue` | Weak-phrase SRS cards due through horizon (`horizon_days`) |
+| `POST` | `/learner/srs/{id}/done` | Successful review → SM-2 lite next due (1→3→7→14 days) |
 
 TTS defaults to a silent-WAV synthetic engine (CI-safe). Set `USE_EDGE_TTS=true` and install optional `edge-tts` to use the async Edge adapter (falls back to synthetic on missing SDK/network errors).
 
 **Pha 2 pronunciation:** upload/score returns pronunciation / completeness / prosody plus per-word green/yellow/red bands. Default engine is synthetic (CI-safe). Set `USE_AZURE_PA=true` + `AZURE_SPEECH_KEY` (optional `uv sync --group speech`) for Azure: WebM/other formats convert to 16 kHz mono PCM via ffmpeg, then Speech SDK Pronunciation Assessment; failures fall back to synthetic. `PA_DAILY_LIMIT` caps score calls per user/day.
 
-**Pha 2 learning loop:** red/yellow PA words enqueue SRS cards for T+1. Role-play supports `read_along` vs `free_speech`; free speech adds empathy rubric + clinical disclaimer (`USE_GEMINI_EMPATHY` + `GEMINI_API_KEY` for Gemini; synthetic fallback).
+**Pha 2 learning loop:** red/yellow PA words enqueue SRS cards (first due T+1). Done advances SM-2 lite intervals (1→3→7→14); a new miss resets. Role-play supports `read_along` vs `free_speech`; free speech adds empathy rubric + clinical disclaimer (`USE_GEMINI_EMPATHY` + `GEMINI_API_KEY` for Gemini; synthetic fallback).
 
 **Pha 2 progression:** lesson completion awards virtual CME (+ role-play PA bonus). Rank ladder Medical Student → Chief of Staff. Editors set `module_slug` / unlock CME / unlock rank / prerequisite case (cycle-safe). Module CME threshold issues a shareable digital certificate with disclaimer.
 

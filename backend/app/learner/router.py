@@ -175,6 +175,7 @@ class SrsCardOut(BaseModel):
     phrase: str
     band: str
     due_at: str
+    repetition: int = 0
     source_attempt_id: int | None = None
 
 
@@ -948,6 +949,7 @@ def list_srs_queue(
             phrase=card.phrase,
             band=card.band,
             due_at=card.due_at,
+            repetition=card.repetition,
             source_attempt_id=card.source_attempt_id,
         )
         for card in cards
@@ -969,5 +971,6 @@ def complete_srs_card(
         phrase=card.phrase,
         band=card.band,
         due_at=card.due_at,
+        repetition=card.repetition,
         source_attempt_id=card.source_attempt_id,
     )

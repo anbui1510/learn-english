@@ -7,6 +7,9 @@ from typing import Any
 
 from app.users.db import connect, init_db
 
+# Successful-review intervals (days): 1 → 3 → 7 → 14 (US-G2-031 SM-2 lite).
+SM2_INTERVALS_DAYS = (1, 3, 7, 14)
+
 
 def _now() -> str:
     return datetime.now(UTC).isoformat()
@@ -14,6 +17,14 @@ def _now() -> str:
 
 def _tomorrow() -> str:
     return (date.today() + timedelta(days=1)).isoformat()
+
+
+def next_interval_days(repetition_after: int) -> int:
+    """Map 1-based repetition count to the capped SM-2 lite ladder."""
+    if repetition_after < 1:
+        return SM2_INTERVALS_DAYS[0]
+    index = min(repetition_after, len(SM2_INTERVALS_DAYS)) - 1
+    return SM2_INTERVALS_DAYS[index]
 
 
 @dataclass(frozen=True)
@@ -25,10 +36,12 @@ class SrsCard:
     band: str
     due_at: str
     done_at: str | None
+    repetition: int
     created_at: str
 
 
 def _row(row: sqlite3.Row) -> SrsCard:
+    keys = set(row.keys())
     return SrsCard(
         id=row["id"],
         user_id=row["user_id"],
@@ -37,12 +50,13 @@ def _row(row: sqlite3.Row) -> SrsCard:
         band=row["band"],
         due_at=row["due_at"],
         done_at=row["done_at"],
+        repetition=int(row["repetition"]) if "repetition" in keys else 0,
         created_at=row["created_at"],
     )
 
 
 class SrsRepository:
-    """Simple T+1 spaced repetition for weak PA phrases."""
+    """Spaced repetition for weak PA phrases (SM-2 lite intervals)."""
 
     def __init__(self, db_path: str) -> None:
         self.db_path = db_path
@@ -87,8 +101,8 @@ class SrsRepository:
                         """
                         INSERT INTO srs_cards (
                             user_id, phrase, source_attempt_id, band,
-                            due_at, done_at, created_at
-                        ) VALUES (?, ?, ?, ?, ?, NULL, ?)
+                            due_at, done_at, repetition, created_at
+                        ) VALUES (?, ?, ?, ?, ?, NULL, 0, ?)
                         """,
                         (user_id, phrase, attempt_id, band, due, _now()),
                     )
@@ -99,12 +113,7 @@ class SrsRepository:
                     assert row is not None
                     created.append(_row(row))
                     continue
-                # Re-queue: clear done, bump band severity, keep earliest due
-                new_due = existing["due_at"]
-                if existing["done_at"]:
-                    new_due = due
-                elif due < existing["due_at"]:
-                    new_due = due
+                # Miss again: reset schedule to T+1 and clear SM-2 progress.
                 prefer_band = (
                     "red"
                     if band == "red" or existing["band"] == "red"
@@ -116,10 +125,11 @@ class SrsRepository:
                     SET source_attempt_id = ?,
                         band = ?,
                         due_at = ?,
-                        done_at = NULL
+                        done_at = NULL,
+                        repetition = 0
                     WHERE id = ?
                     """,
-                    (attempt_id, prefer_band, new_due, existing["id"]),
+                    (attempt_id, prefer_band, due, existing["id"]),
                 )
                 row = conn.execute(
                     "SELECT * FROM srs_cards WHERE id = ?",
@@ -155,9 +165,21 @@ class SrsRepository:
             ).fetchone()
             if row is None:
                 return None
+            keys = set(row.keys())
+            current_rep = int(row["repetition"]) if "repetition" in keys else 0
+            new_rep = current_rep + 1
+            interval = next_interval_days(new_rep)
+            next_due = (date.today() + timedelta(days=interval)).isoformat()
+            # Clear done_at so the card returns when due_at arrives.
             conn.execute(
-                "UPDATE srs_cards SET done_at = ? WHERE id = ?",
-                (_now(), card_id),
+                """
+                UPDATE srs_cards
+                SET repetition = ?,
+                    due_at = ?,
+                    done_at = NULL
+                WHERE id = ?
+                """,
+                (new_rep, next_due, card_id),
             )
             conn.commit()
             updated = conn.execute(

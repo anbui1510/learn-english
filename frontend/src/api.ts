@@ -809,6 +809,7 @@ export type SrsCard = {
   phrase: string
   band: string
   due_at: string
+  repetition?: number
   source_attempt_id?: number | null
 }
 

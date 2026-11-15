@@ -186,6 +186,7 @@ CREATE TABLE IF NOT EXISTS srs_cards (
     band TEXT NOT NULL CHECK(band IN ('red', 'yellow')),
     due_at TEXT NOT NULL,
     done_at TEXT,
+    repetition INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     UNIQUE(user_id, phrase),
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -252,6 +253,10 @@ _ATTEMPT_COLUMNS: dict[str, str] = {
     "scored_at": "TEXT",
     "response_mode": "TEXT NOT NULL DEFAULT 'read_along'",
     "empathy_json": "TEXT",
+}
+
+_SRS_COLUMNS: dict[str, str] = {
+    "repetition": "INTEGER NOT NULL DEFAULT 0",
 }
 
 _CASE_COLUMNS: dict[str, str] = {
@@ -363,6 +368,12 @@ def init_db(conn: sqlite3.Connection) -> None:
     for name, col_type in _ATTEMPT_COLUMNS.items():
         if name not in attempt_cols:
             conn.execute(f"ALTER TABLE learning_attempts ADD COLUMN {name} {col_type}")
+    srs_cols = {
+        row[1] for row in conn.execute("PRAGMA table_info(srs_cards)").fetchall()
+    }
+    for name, col_type in _SRS_COLUMNS.items():
+        if name not in srs_cols:
+            conn.execute(f"ALTER TABLE srs_cards ADD COLUMN {name} {col_type}")
     _migrate_facts_status_rejected(conn)
     _seed_book_sources(conn)
     _seed_org_tts_defaults(conn)

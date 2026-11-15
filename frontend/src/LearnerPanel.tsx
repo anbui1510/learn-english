@@ -803,9 +803,9 @@ export function LearnerPanel({ onError }: Props) {
           </div>
 
           <div className="mt-6 border-t border-slate-200 pt-4">
-            <h3 className="text-base font-semibold">SRS queue (T+1)</h3>
+            <h3 className="text-base font-semibold">SRS queue</h3>
             <p className="mt-1 text-sm text-slate-500">
-              Weak words from PA land here for review the next day.
+              Weak PA words for spaced review (1→3→7→14 days after each Done).
             </p>
             {srsCards.length === 0 ? (
               <p className="mt-2 text-sm text-slate-500">No cards due yet.</p>
@@ -825,7 +825,10 @@ export function LearnerPanel({ onError }: Props) {
                         {card.phrase}
                       </span>
                       <span className="ml-2 text-xs text-slate-500">
-                        due {card.due_at}
+                        next review {card.due_at}
+                        {typeof card.repetition === 'number'
+                          ? ` · rep ${card.repetition}`
+                          : ''}
                       </span>
                     </span>
                     <button
