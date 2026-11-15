@@ -158,3 +158,6 @@ class LearnerProfileRepository:
                 )
                 for row in rows
             ]
+
+    def completion_timestamps(self, user_id: int) -> list[str]:
+        return [row.completed_at for row in self.list_completions(user_id)]

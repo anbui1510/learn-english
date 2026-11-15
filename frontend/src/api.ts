@@ -73,6 +73,24 @@ export async function assignRole(
   return (await response.json()) as AdminUser
 }
 
+export type PaUsageRow = {
+  user_id: number
+  email: string | null
+  usage_day: string
+  score_count: number
+  estimated_cost_usd: number
+}
+
+export async function fetchPaUsage(days = 14): Promise<PaUsageRow[]> {
+  const response = await fetch(`${API_BASE}/admin/pa-usage?days=${days}`, {
+    credentials: 'include',
+  })
+  if (!response.ok) {
+    throw new Error(`Failed to load PA usage (${response.status})`)
+  }
+  return (await response.json()) as PaUsageRow[]
+}
+
 export type ExtractStatus =
   | 'none'
   | 'queued'
@@ -97,6 +115,7 @@ export type CaseDraft = {
   unlock_cme_points?: number
   unlock_rank?: string | null
   unlock_requires_case_id?: number | null
+  unlock_requires_streak_days?: number
 }
 
 export type ClinicalFact = {
@@ -316,6 +335,7 @@ export type Progression = {
   rank_label: string
   cases_completed: number
   cme_points: number
+  streak_days?: number
   certificates: {
     id: number
     module_slug: string
@@ -542,6 +562,7 @@ export async function patchCaseProgression(
     unlock_rank?: string | null
     unlock_requires_case_id?: number | null
     clear_unlock_requires_case?: boolean
+    unlock_requires_streak_days?: number
   },
 ): Promise<CaseDraft> {
   const response = await fetch(`${API_BASE}/editor/cases/${caseId}/progression`, {

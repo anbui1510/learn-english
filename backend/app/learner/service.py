@@ -25,7 +25,11 @@ def get_learning_attempt_repository() -> LearningAttemptRepository:
 @lru_cache
 def get_pa_rate_limiter() -> PaRateLimiter:
     settings = get_auth_settings()
-    return PaRateLimiter(settings.database_path, daily_limit=settings.pa_daily_limit)
+    return PaRateLimiter(
+        settings.database_path,
+        daily_limit=settings.pa_daily_limit,
+        cost_per_score_usd=settings.pa_cost_per_score_usd,
+    )
 
 
 @lru_cache

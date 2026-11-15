@@ -31,6 +31,9 @@ DEFAULT_TREE: list[dict[str, Any]] = [
     },
 ]
 
+# Grouping modules always leave their leaf tracks open; specialties gate on complete.
+OPEN_CHILD_PARENTS = {"peds-foundations"}
+
 
 @dataclass(frozen=True)
 class TreeNodeView:
@@ -54,20 +57,48 @@ def _flatten(nodes: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
+def _nested_children_map(nodes: list[dict[str, Any]]) -> dict[str, list[str]]:
+    """Use nested tree children only (not sibling nodes that share parent_slug)."""
+    mapping: dict[str, list[str]] = {}
+
+    def walk(items: list[dict[str, Any]]) -> None:
+        for node in items:
+            kids = node.get("children") or []
+            mapping[str(node["slug"])] = [str(child["slug"]) for child in kids]
+            if kids:
+                walk(kids)
+
+    walk(nodes)
+    return mapping
+
+
 def module_complete(
     *,
     module_slug: str,
     cases_by_module: dict[str, list[int]],
     completed_case_ids: set[int],
     certified_modules: set[str],
+    children_by_parent: dict[str, list[str]] | None = None,
 ) -> bool:
     if module_slug in certified_modules:
         return True
     case_ids = cases_by_module.get(module_slug) or []
-    if not case_ids:
-        # No published cases yet — treat incomplete (cannot auto-unlock children).
+    if case_ids:
+        return all(case_id in completed_case_ids for case_id in case_ids)
+    # Grouping module: complete when every child module is complete.
+    kids = (children_by_parent or {}).get(module_slug) or []
+    if not kids:
         return False
-    return all(case_id in completed_case_ids for case_id in case_ids)
+    return all(
+        module_complete(
+            module_slug=child,
+            cases_by_module=cases_by_module,
+            completed_case_ids=completed_case_ids,
+            certified_modules=certified_modules,
+            children_by_parent=children_by_parent,
+        )
+        for child in kids
+    )
 
 
 def build_skill_tree(
@@ -80,16 +111,20 @@ def build_skill_tree(
     catalog = tree if tree is not None else DEFAULT_TREE
     flat = _flatten(catalog)
     parents = {n["slug"]: n.get("parent_slug") for n in flat}
+    children_by_parent = _nested_children_map(catalog)
 
     def node_unlocked(slug: str) -> tuple[bool, str | None]:
         parent = parents.get(slug)
         if not parent:
+            return True, None
+        if parent in OPEN_CHILD_PARENTS and slug != "peds-cardiology":
             return True, None
         if module_complete(
             module_slug=parent,
             cases_by_module=cases_by_module,
             completed_case_ids=completed_case_ids,
             certified_modules=certified_modules,
+            children_by_parent=children_by_parent,
         ):
             return True, None
         return False, f"Complete module '{parent}' first"
@@ -102,6 +137,7 @@ def build_skill_tree(
             cases_by_module=cases_by_module,
             completed_case_ids=completed_case_ids,
             certified_modules=certified_modules,
+            children_by_parent=children_by_parent,
         )
         children = [render(child) for child in (node.get("children") or [])]
         return TreeNodeView(

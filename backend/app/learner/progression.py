@@ -343,10 +343,12 @@ def evaluate_unlock(
     completed_cases: set[int],
     cme_total: int,
     rank_id: str,
+    streak_days: int = 0,
 ) -> UnlockDecision:
     req_case = getattr(case, "unlock_requires_case_id", None)
     req_cme = getattr(case, "unlock_cme_points", None) or 0
     req_rank = getattr(case, "unlock_rank", None)
+    req_streak = getattr(case, "unlock_requires_streak_days", None) or 0
     if req_case is not None and req_case not in completed_cases:
         return UnlockDecision(
             False, f"Complete prerequisite case #{req_case} first"
@@ -359,6 +361,11 @@ def evaluate_unlock(
             req_rank,
         )
         return UnlockDecision(False, f"Reach rank {label} first")
+    if req_streak and streak_days < req_streak:
+        return UnlockDecision(
+            False,
+            f"Need a {req_streak}-day learning streak (have {streak_days})",
+        )
     return UnlockDecision(True)
 
 
@@ -366,6 +373,7 @@ def progression_snapshot(
     *,
     user_id: int,
     repo: ProgressionRepository,
+    streak_days: int = 0,
 ) -> dict[str, Any]:
     completed = repo.completed_case_ids(user_id)
     rank_id, rank_label = rank_for_completions(len(completed))
@@ -374,6 +382,7 @@ def progression_snapshot(
         "rank_label": rank_label,
         "cases_completed": len(completed),
         "cme_points": repo.cme_total(user_id),
+        "streak_days": streak_days,
         "certificates": [
             {
                 "id": c.id,

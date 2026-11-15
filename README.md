@@ -115,6 +115,8 @@ TTS defaults to a silent-WAV synthetic engine (CI-safe). Set `USE_EDGE_TTS=true`
 
 **Pha 2 skill tree + replay:** `GET /learner/skill-tree` exposes Nhi đại cương → Tim mạch nhi locks; cases inherit module locks. Tap a red PA word to `.../words/{word}/replay` the AI TTS snippet.
 
+**Pha 2 streak + PA cost log:** editors can require an N-day learning streak to unlock a case; `GET /admin/pa-usage` lists score calls/user/day with optional `PA_COST_PER_SCORE_USD` estimates.
+
 ### Google OAuth setup (manual verify)
 
 1. Create an OAuth 2.0 **Web application** client in Google Cloud Console.

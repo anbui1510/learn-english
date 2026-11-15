@@ -20,6 +20,8 @@ def test_skill_tree_locks_cardiology_until_foundations() -> None:
         certified_modules=set(),
     )
     payload = tree_to_dict(nodes)
+    foundations = next(n for n in payload if n["slug"] == "peds-foundations")
+    assert foundations["children"][0]["unlocked"] is True
     cardio = next(n for n in payload if n["slug"] == "peds-cardiology")
     assert cardio["unlocked"] is False
     assert "peds-foundations" in (cardio["unlock_reason"] or "")
@@ -30,9 +32,8 @@ def test_skill_tree_locks_cardiology_until_foundations() -> None:
             "peds-diarrhea": [2],
             "peds-respiratory": [3],
             "peds-cardiology": [4],
-            "peds-foundations": [10],
         },
-        completed_case_ids={10},
+        completed_case_ids={1, 2, 3},
         certified_modules=set(),
     )
     cardio2 = next(n for n in tree_to_dict(unlocked) if n["slug"] == "peds-cardiology")

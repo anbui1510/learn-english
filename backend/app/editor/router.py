@@ -69,6 +69,7 @@ class CaseOut(BaseModel):
     unlock_cme_points: int = 0
     unlock_rank: str | None = None
     unlock_requires_case_id: int | None = None
+    unlock_requires_streak_days: int = 0
     created_at: str
     updated_at: str
 
@@ -79,6 +80,7 @@ class CaseProgressionIn(BaseModel):
     unlock_rank: str | None = None
     unlock_requires_case_id: int | None = None
     clear_unlock_requires_case: bool = False
+    unlock_requires_streak_days: int | None = Field(default=None, ge=0, le=30)
 
 
 class FactPatchIn(BaseModel):
@@ -152,6 +154,7 @@ def _case_out(case: CaseRecord) -> CaseOut:
         unlock_cme_points=case.unlock_cme_points,
         unlock_rank=case.unlock_rank,
         unlock_requires_case_id=case.unlock_requires_case_id,
+        unlock_requires_streak_days=case.unlock_requires_streak_days,
         created_at=case.created_at,
         updated_at=case.updated_at,
     )
@@ -332,6 +335,7 @@ def patch_case_progression(
         unlock_rank=body.unlock_rank,
         unlock_requires_case_id=body.unlock_requires_case_id,
         clear_unlock_requires_case=body.clear_unlock_requires_case,
+        unlock_requires_streak_days=body.unlock_requires_streak_days,
     )
     return _case_out(updated)
 

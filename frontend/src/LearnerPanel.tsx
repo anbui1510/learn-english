@@ -361,6 +361,8 @@ export function LearnerPanel({ onError }: Props) {
             Rank: <span className="font-medium">{progression.rank_label}</span>
             {' · '}
             {progression.cases_completed} cases · {progression.cme_points} CME
+            {' · '}
+            streak {progression.streak_days ?? 0}d
           </p>
           {progression.certificates.length > 0 ? (
             <ul className="mt-1 text-xs text-slate-500">

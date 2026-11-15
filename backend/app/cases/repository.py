@@ -34,6 +34,7 @@ class CaseRecord:
     unlock_cme_points: int
     unlock_rank: str | None
     unlock_requires_case_id: int | None
+    unlock_requires_streak_days: int
     created_at: str
     updated_at: str
 
@@ -82,6 +83,12 @@ def _row_to_case(row: sqlite3.Row) -> CaseRecord:
             row["unlock_requires_case_id"]
             if "unlock_requires_case_id" in keys
             else None
+        ),
+        unlock_requires_streak_days=(
+            int(row["unlock_requires_streak_days"])
+            if "unlock_requires_streak_days" in keys
+            and row["unlock_requires_streak_days"] is not None
+            else 0
         ),
         created_at=row["created_at"],
         updated_at=row["updated_at"],
@@ -273,6 +280,7 @@ class CaseRepository:
         unlock_rank: str | None = None,
         unlock_requires_case_id: int | None = None,
         clear_unlock_requires_case: bool = False,
+        unlock_requires_streak_days: int | None = None,
     ) -> CaseRecord:
         now = _now()
         with self._conn() as conn:
@@ -301,6 +309,17 @@ class CaseRepository:
                 next_req = unlock_requires_case_id
             else:
                 next_req = existing["unlock_requires_case_id"]
+            keys = existing.keys()
+            next_streak = (
+                unlock_requires_streak_days
+                if unlock_requires_streak_days is not None
+                else (
+                    int(existing["unlock_requires_streak_days"])
+                    if "unlock_requires_streak_days" in keys
+                    and existing["unlock_requires_streak_days"] is not None
+                    else 0
+                )
+            )
             conn.execute(
                 """
                 UPDATE cases
@@ -308,10 +327,19 @@ class CaseRepository:
                     unlock_cme_points = ?,
                     unlock_rank = ?,
                     unlock_requires_case_id = ?,
+                    unlock_requires_streak_days = ?,
                     updated_at = ?
                 WHERE id = ?
                 """,
-                (next_module, next_cme, next_rank, next_req, now, case_id),
+                (
+                    next_module,
+                    next_cme,
+                    next_rank,
+                    next_req,
+                    next_streak,
+                    now,
+                    case_id,
+                ),
             )
             conn.commit()
             row = conn.execute(

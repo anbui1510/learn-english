@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS cases (
     unlock_cme_points INTEGER NOT NULL DEFAULT 0,
     unlock_rank TEXT,
     unlock_requires_case_id INTEGER,
+    unlock_requires_streak_days INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     FOREIGN KEY(owner_user_id) REFERENCES users(id),
@@ -228,6 +229,7 @@ _CASE_COLUMNS: dict[str, str] = {
     "unlock_cme_points": "INTEGER NOT NULL DEFAULT 0",
     "unlock_rank": "TEXT",
     "unlock_requires_case_id": "INTEGER",
+    "unlock_requires_streak_days": "INTEGER NOT NULL DEFAULT 0",
 }
 
 

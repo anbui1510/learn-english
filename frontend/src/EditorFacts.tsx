@@ -58,6 +58,7 @@ export function EditorFacts({ onError }: Props) {
   const [unlockCme, setUnlockCme] = useState(0)
   const [unlockRank, setUnlockRank] = useState('')
   const [unlockRequiresCaseId, setUnlockRequiresCaseId] = useState('')
+  const [unlockStreakDays, setUnlockStreakDays] = useState(0)
 
   const refreshCases = useCallback(async () => {
     const listed = await listMyCases()
@@ -143,6 +144,7 @@ export function EditorFacts({ onError }: Props) {
         ? String(selected.unlock_requires_case_id)
         : '',
     )
+    setUnlockStreakDays(selected.unlock_requires_streak_days ?? 0)
   }, [selected])
 
   function toggleContext(context: DialogueContext) {
@@ -205,6 +207,7 @@ export function EditorFacts({ onError }: Props) {
         unlock_rank: unlockRank || null,
         unlock_requires_case_id: reqId ? Number(reqId) : null,
         clear_unlock_requires_case: !reqId,
+        unlock_requires_streak_days: unlockStreakDays,
       })
       await refreshCases()
       setNote('Progression rules saved')
@@ -340,6 +343,17 @@ export function EditorFacts({ onError }: Props) {
                   value={unlockRequiresCaseId}
                   onChange={(e) => setUnlockRequiresCaseId(e.target.value)}
                   placeholder="optional"
+                />
+              </label>
+              <label>
+                Requires streak days
+                <input
+                  type="number"
+                  min={0}
+                  max={30}
+                  className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+                  value={unlockStreakDays}
+                  onChange={(e) => setUnlockStreakDays(Number(e.target.value))}
                 />
               </label>
               <button

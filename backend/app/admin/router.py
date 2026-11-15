@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from app.auth.deps import require_admin
+from app.learner.service import get_pa_rate_limiter
 from app.users.repository import UserRecord
 from app.users.roles import ROLES, Role, parse_role
 from app.users.service import get_user_repository
@@ -80,6 +81,33 @@ def assign_role(
             detail="User not found",
         ) from exc
     return _to_out(updated)
+
+
+class PaUsageOut(BaseModel):
+    user_id: int
+    email: str | None
+    usage_day: str
+    score_count: int
+    estimated_cost_usd: float
+
+
+@router.get("/pa-usage", response_model=list[PaUsageOut])
+def pa_usage_report(
+    _: Annotated[UserRecord, Depends(require_admin)],
+    days: Annotated[int, Query(ge=1, le=90)] = 14,
+) -> list[PaUsageOut]:
+    """Daily pronunciation score calls per user (Azure cost control log)."""
+    rows = get_pa_rate_limiter().usage_report(days=days)
+    return [
+        PaUsageOut(
+            user_id=row.user_id,
+            email=row.email,
+            usage_day=row.usage_day,
+            score_count=row.score_count,
+            estimated_cost_usd=row.estimated_cost_usd,
+        )
+        for row in rows
+    ]
 
 
 @router.get("/users/{user_id}/role-audit", response_model=list[RoleAuditOut])

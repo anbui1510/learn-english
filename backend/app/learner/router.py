@@ -33,6 +33,7 @@ from app.learner.service import (
 )
 from app.learner.shadowing import build_shadowing_cards
 from app.learner.skill_tree import build_skill_tree, tree_to_dict
+from app.learner.streak import completion_days, current_streak
 from app.speech.service import get_utterance_repository
 from app.speech.synthesize import synthesize_dialogue
 from app.storage.factory import get_storage
@@ -255,6 +256,11 @@ def _cases_by_module() -> dict[str, list[int]]:
     return grouped
 
 
+def _streak_days(user_id: int) -> int:
+    stamps = get_learner_profile_repository().completion_timestamps(user_id)
+    return current_streak(completion_days(stamps))
+
+
 def _module_lock_map(user_id: int) -> dict[str, tuple[bool, str | None]]:
     progress = get_progression_repository()
     completed = progress.completed_case_ids(user_id)
@@ -283,6 +289,7 @@ def list_published_cases(
     completed = progress.completed_case_ids(user.id)
     cme_total = progress.cme_total(user.id)
     rank_id, _ = rank_for_completions(len(completed))
+    streak = _streak_days(user.id)
     module_locks = _module_lock_map(user.id)
     out: list[PublishedCaseOut] = []
     for case in get_case_repository().list_published():
@@ -291,6 +298,7 @@ def list_published_cases(
             completed_cases=completed,
             cme_total=cme_total,
             rank_id=rank_id,
+            streak_days=streak,
         )
         unlocked = decision.unlocked
         reason = decision.reason
@@ -402,12 +410,22 @@ def _assert_unlocked(user: UserRecord, case) -> None:
         completed_cases=completed,
         cme_total=cme_total,
         rank_id=rank_id,
+        streak_days=_streak_days(user.id),
     )
     if not decision.unlocked:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=decision.reason or "Case is locked",
         )
+    if case.module_slug:
+        mod_ok, mod_reason = _module_lock_map(user.id).get(
+            case.module_slug, (True, None)
+        )
+        if not mod_ok:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=mod_reason or "Module is locked",
+            )
 
 
 @router.get("/dialogues/{dialogue_id}/lesson", response_model=LessonOut)
@@ -490,6 +508,7 @@ def complete_lesson(
         completed_cases=completed,
         cme_total=cme_total,
         rank_id=rank_id,
+        streak_days=_streak_days(user.id),
     )
     if not decision.unlocked:
         raise HTTPException(
@@ -551,7 +570,9 @@ def get_progression(
     user: Annotated[UserRecord, Depends(require_learner_access)],
 ) -> dict[str, Any]:
     return progression_snapshot(
-        user_id=user.id, repo=get_progression_repository()
+        user_id=user.id,
+        repo=get_progression_repository(),
+        streak_days=_streak_days(user.id),
     )
 
 

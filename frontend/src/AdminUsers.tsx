@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react'
-import { assignRole, listUsers, type AdminUser, type Role } from './api'
+import {
+  assignRole,
+  fetchPaUsage,
+  listUsers,
+  type AdminUser,
+  type PaUsageRow,
+  type Role,
+} from './api'
 
 const ROLE_OPTIONS: Role[] = ['learner', 'editor', 'admin']
 
@@ -9,6 +16,7 @@ type Props = {
 
 export function AdminUsers({ onError }: Props) {
   const [users, setUsers] = useState<AdminUser[]>([])
+  const [paUsage, setPaUsage] = useState<PaUsageRow[]>([])
   const [loading, setLoading] = useState(true)
   const [savingId, setSavingId] = useState<number | null>(null)
 
@@ -16,9 +24,10 @@ export function AdminUsers({ onError }: Props) {
     let cancelled = false
     ;(async () => {
       try {
-        const rows = await listUsers()
+        const [rows, usage] = await Promise.all([listUsers(), fetchPaUsage(14)])
         if (!cancelled) {
           setUsers(rows)
+          setPaUsage(usage)
           onError(null)
         }
       } catch (err) {
@@ -48,6 +57,8 @@ export function AdminUsers({ onError }: Props) {
       setSavingId(null)
     }
   }
+
+  const paTotalCost = paUsage.reduce((sum, row) => sum + row.estimated_cost_usd, 0)
 
   return (
     <section className="mt-8 border-t border-slate-200 pt-8">
@@ -98,6 +109,26 @@ export function AdminUsers({ onError }: Props) {
           </table>
         </div>
       )}
+
+      <div className="mt-8">
+        <h3 className="text-base font-semibold">PA usage (14 days)</h3>
+        <p className="mt-1 text-sm text-slate-500">
+          Score calls per user/day for Azure cost control. Est. total $
+          {paTotalCost.toFixed(4)}
+        </p>
+        {paUsage.length === 0 ? (
+          <p className="mt-2 text-sm text-slate-500">No PA usage yet.</p>
+        ) : (
+          <ul className="mt-2 space-y-1 text-sm">
+            {paUsage.slice(0, 20).map((row) => (
+              <li key={`${row.user_id}-${row.usage_day}`}>
+                {row.usage_day} · {row.email ?? `user #${row.user_id}`} ·{' '}
+                {row.score_count} scores · ${row.estimated_cost_usd.toFixed(4)}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </section>
   )
 }
