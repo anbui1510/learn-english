@@ -30,6 +30,7 @@ import {
 import { ensureMicrophonePermission, isNativePlatform } from './mobile'
 import { resolveLessonAudioUrl } from './offlineCache'
 import { peakStressIndexes, stressPatternAligns } from './stressHighlight'
+import { friendlyVoiceLabel } from './ttsLabels'
 
 type Props = {
   onError: (message: string | null) => void
@@ -614,6 +615,19 @@ export function LearnerPanel({ onError }: Props) {
               {lesson.citation_pages.length
                 ? ` · pages ${lesson.citation_pages.join(', ')}`
                 : ''}
+            </p>
+            <p
+              className="mt-2 text-xs text-slate-700"
+              aria-label={`TTS engine ${lesson.tts_provider ?? 'synthetic'}, voice ${friendlyVoiceLabel(current?.voice)}`}
+            >
+              <span className="font-medium text-slate-800">Engine:</span>{' '}
+              {lesson.tts_provider ?? 'synthetic'}
+              {' · '}
+              <span className="font-medium text-slate-800">Voice:</span>{' '}
+              {friendlyVoiceLabel(current?.voice)}
+              {current?.voice ? (
+                <span className="text-slate-500"> ({current.voice})</span>
+              ) : null}
             </p>
             <p className="mt-2 text-xs text-slate-600">
               Keyboard: focus this player, then ← / → for lines, Home / End for

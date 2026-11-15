@@ -36,6 +36,7 @@ from app.learner.skill_tree import build_skill_tree, tree_to_dict
 from app.learner.streak import completion_days, current_streak
 from app.speech.service import get_utterance_repository
 from app.speech.synthesize import synthesize_dialogue
+from app.speech.tts import get_effective_tts_provider
 from app.storage.factory import get_storage
 from app.users.repository import UserRecord
 
@@ -93,6 +94,7 @@ class LessonOut(BaseModel):
     session_kind: Literal["standard", "presentation"] = "standard"
     target_seconds: float | None = None
     estimated_seconds: float = 0.0
+    tts_provider: Literal["synthetic", "edge", "azure", "elevenlabs"] = "synthetic"
 
 
 class ShadowingOut(BaseModel):
@@ -510,6 +512,7 @@ def get_lesson(
         session_kind=session_kind,
         target_seconds=float(target) if target is not None else None,
         estimated_seconds=float(dialogue.estimated_seconds),
+        tts_provider=get_effective_tts_provider(),
     )
 
 
