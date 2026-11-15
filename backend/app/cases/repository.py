@@ -30,6 +30,10 @@ class CaseRecord:
     extract_finished_at: str | None
     published_at: str | None
     published_by_user_id: int | None
+    module_slug: str | None
+    unlock_cme_points: int
+    unlock_rank: str | None
+    unlock_requires_case_id: int | None
     created_at: str
     updated_at: str
 
@@ -66,6 +70,18 @@ def _row_to_case(row: sqlite3.Row) -> CaseRecord:
         published_at=row["published_at"] if "published_at" in keys else None,
         published_by_user_id=(
             row["published_by_user_id"] if "published_by_user_id" in keys else None
+        ),
+        module_slug=row["module_slug"] if "module_slug" in keys else None,
+        unlock_cme_points=(
+            int(row["unlock_cme_points"])
+            if "unlock_cme_points" in keys and row["unlock_cme_points"] is not None
+            else 0
+        ),
+        unlock_rank=row["unlock_rank"] if "unlock_rank" in keys else None,
+        unlock_requires_case_id=(
+            row["unlock_requires_case_id"]
+            if "unlock_requires_case_id" in keys
+            else None
         ),
         created_at=row["created_at"],
         updated_at=row["updated_at"],
@@ -232,6 +248,70 @@ class CaseRepository:
                 WHERE id = ?
                 """,
                 (now, publisher.id, now, case_id),
+            )
+            conn.commit()
+            row = conn.execute(
+                "SELECT * FROM cases WHERE id = ?",
+                (case_id,),
+            ).fetchone()
+            assert row is not None
+            return _row_to_case(row)
+
+    def unlock_edges(self) -> dict[int, int | None]:
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT id, unlock_requires_case_id FROM cases"
+            ).fetchall()
+            return {int(r["id"]): r["unlock_requires_case_id"] for r in rows}
+
+    def set_progression(
+        self,
+        *,
+        case_id: int,
+        module_slug: str | None = None,
+        unlock_cme_points: int | None = None,
+        unlock_rank: str | None = None,
+        unlock_requires_case_id: int | None = None,
+        clear_unlock_requires_case: bool = False,
+    ) -> CaseRecord:
+        now = _now()
+        with self._conn() as conn:
+            existing = conn.execute(
+                "SELECT * FROM cases WHERE id = ?",
+                (case_id,),
+            ).fetchone()
+            if existing is None:
+                raise KeyError(f"case {case_id} not found")
+            next_module = (
+                module_slug
+                if module_slug is not None
+                else existing["module_slug"]
+            )
+            next_cme = (
+                unlock_cme_points
+                if unlock_cme_points is not None
+                else (existing["unlock_cme_points"] or 0)
+            )
+            next_rank = (
+                unlock_rank if unlock_rank is not None else existing["unlock_rank"]
+            )
+            if clear_unlock_requires_case:
+                next_req = None
+            elif unlock_requires_case_id is not None:
+                next_req = unlock_requires_case_id
+            else:
+                next_req = existing["unlock_requires_case_id"]
+            conn.execute(
+                """
+                UPDATE cases
+                SET module_slug = ?,
+                    unlock_cme_points = ?,
+                    unlock_rank = ?,
+                    unlock_requires_case_id = ?,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (next_module, next_cme, next_rank, next_req, now, case_id),
             )
             conn.commit()
             row = conn.execute(

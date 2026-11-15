@@ -65,8 +65,20 @@ class CaseOut(BaseModel):
     extract_finished_at: str | None = None
     published_at: str | None = None
     published_by_user_id: int | None = None
+    module_slug: str | None = None
+    unlock_cme_points: int = 0
+    unlock_rank: str | None = None
+    unlock_requires_case_id: int | None = None
     created_at: str
     updated_at: str
+
+
+class CaseProgressionIn(BaseModel):
+    module_slug: str | None = None
+    unlock_cme_points: int | None = Field(default=None, ge=0)
+    unlock_rank: str | None = None
+    unlock_requires_case_id: int | None = None
+    clear_unlock_requires_case: bool = False
 
 
 class FactPatchIn(BaseModel):
@@ -136,6 +148,10 @@ def _case_out(case: CaseRecord) -> CaseOut:
         extract_finished_at=case.extract_finished_at,
         published_at=case.published_at,
         published_by_user_id=case.published_by_user_id,
+        module_slug=case.module_slug,
+        unlock_cme_points=case.unlock_cme_points,
+        unlock_rank=case.unlock_rank,
+        unlock_requires_case_id=case.unlock_requires_case_id,
         created_at=case.created_at,
         updated_at=case.updated_at,
     )
@@ -265,6 +281,59 @@ def get_case(
     user: Annotated[UserRecord, Depends(require_editor)],
 ) -> CaseOut:
     return _case_out(_require_case_access(user, case_id))
+
+
+@router.patch("/cases/{case_id}/progression", response_model=CaseOut)
+def patch_case_progression(
+    case_id: int,
+    body: CaseProgressionIn,
+    user: Annotated[UserRecord, Depends(require_editor)],
+) -> CaseOut:
+    from app.learner.progression import RANK_LADDER, would_create_unlock_cycle
+
+    case = _require_case_access(user, case_id)
+    if body.unlock_rank is not None and body.unlock_rank not in {
+        rid for rid, _, _ in RANK_LADDER
+    }:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unknown unlock_rank",
+        )
+    if body.unlock_requires_case_id is not None:
+        prereq = get_case_repository().get_by_id(body.unlock_requires_case_id)
+        if prereq is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Prerequisite case not found",
+            )
+    edges = get_case_repository().unlock_edges()
+    next_req = (
+        None
+        if body.clear_unlock_requires_case
+        else (
+            body.unlock_requires_case_id
+            if body.unlock_requires_case_id is not None
+            else case.unlock_requires_case_id
+        )
+    )
+    if would_create_unlock_cycle(
+        case_id=case_id,
+        requires_case_id=next_req,
+        edges=edges,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unlock prerequisite would create a cycle",
+        )
+    updated = get_case_repository().set_progression(
+        case_id=case_id,
+        module_slug=body.module_slug,
+        unlock_cme_points=body.unlock_cme_points,
+        unlock_rank=body.unlock_rank,
+        unlock_requires_case_id=body.unlock_requires_case_id,
+        clear_unlock_requires_case=body.clear_unlock_requires_case,
+    )
+    return _case_out(updated)
 
 
 @router.post("/cases/{case_id}/extract", response_model=ExtractStartOut)

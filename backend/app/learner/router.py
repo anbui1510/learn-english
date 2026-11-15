@@ -15,12 +15,19 @@ from app.dialogues.service import get_dialogue_repository
 from app.facts.service import get_fact_repository
 from app.learner.profiles import CefrPackage
 from app.learner.empathy import empathy_to_dict
+from app.learner.progression import (
+    ROLEPLAY_PA_THRESHOLD,
+    evaluate_unlock,
+    progression_snapshot,
+    rank_for_completions,
+)
 from app.learner.pronunciation import result_to_dict
 from app.learner.service import (
     get_empathy_engine,
     get_learner_profile_repository,
     get_learning_attempt_repository,
     get_pa_rate_limiter,
+    get_progression_repository,
     get_pronunciation_engine,
     get_srs_repository,
 )
@@ -39,6 +46,9 @@ class PublishedCaseOut(BaseModel):
     isbn: str | None
     edition: str | None
     published_at: str | None
+    module_slug: str | None = None
+    unlocked: bool = True
+    unlock_reason: str | None = None
 
 
 class ProfileOut(BaseModel):
@@ -93,6 +103,10 @@ class CompletionOut(BaseModel):
     case_id: int
     dialogue_id: int
     completed_at: str
+    cme_awarded: int = 0
+    rank_id: str | None = None
+    rank_label: str | None = None
+    certificate: dict[str, Any] | None = None
 
 
 class WordScoreOut(BaseModel):
@@ -233,18 +247,33 @@ def _line_reference(dialogue, line_index: int) -> tuple[str, list[int] | None]:
 
 @router.get("/cases", response_model=list[PublishedCaseOut])
 def list_published_cases(
-    _user: Annotated[UserRecord, Depends(require_learner_access)],
+    user: Annotated[UserRecord, Depends(require_learner_access)],
 ) -> list[PublishedCaseOut]:
-    return [
-        PublishedCaseOut(
-            id=case.id,
-            title=case.title,
-            isbn=case.isbn,
-            edition=case.edition,
-            published_at=case.published_at,
+    progress = get_progression_repository()
+    completed = progress.completed_case_ids(user.id)
+    cme_total = progress.cme_total(user.id)
+    rank_id, _ = rank_for_completions(len(completed))
+    out: list[PublishedCaseOut] = []
+    for case in get_case_repository().list_published():
+        decision = evaluate_unlock(
+            case=case,
+            completed_cases=completed,
+            cme_total=cme_total,
+            rank_id=rank_id,
         )
-        for case in get_case_repository().list_published()
-    ]
+        out.append(
+            PublishedCaseOut(
+                id=case.id,
+                title=case.title,
+                isbn=case.isbn,
+                edition=case.edition,
+                published_at=case.published_at,
+                module_slug=case.module_slug,
+                unlocked=decision.unlocked,
+                unlock_reason=decision.reason,
+            )
+        )
+    return out
 
 
 class LearnerDialogueOut(BaseModel):
@@ -325,13 +354,32 @@ def _require_published_dialogue(dialogue_id: int):
     return case, dialogue
 
 
+def _assert_unlocked(user: UserRecord, case) -> None:
+    progress = get_progression_repository()
+    completed = progress.completed_case_ids(user.id)
+    cme_total = progress.cme_total(user.id)
+    rank_id, _ = rank_for_completions(len(completed))
+    decision = evaluate_unlock(
+        case=case,
+        completed_cases=completed,
+        cme_total=cme_total,
+        rank_id=rank_id,
+    )
+    if not decision.unlocked:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=decision.reason or "Case is locked",
+        )
+
+
 @router.get("/dialogues/{dialogue_id}/lesson", response_model=LessonOut)
 def get_lesson(
     dialogue_id: int,
-    _user: Annotated[UserRecord, Depends(require_learner_access)],
+    user: Annotated[UserRecord, Depends(require_learner_access)],
 ) -> LessonOut:
     settings = get_auth_settings()
     case, dialogue = _require_published_dialogue(dialogue_id)
+    _assert_unlocked(user, case)
     utterances = get_utterance_repository().list_for_dialogue(dialogue_id)
     if not utterances:
         # Lazy synthesize on first learner open (MVP convenience).
@@ -379,9 +427,10 @@ def get_lesson(
 @router.get("/dialogues/{dialogue_id}/shadowing", response_model=ShadowingOut)
 def get_shadowing(
     dialogue_id: int,
-    _user: Annotated[UserRecord, Depends(require_learner_access)],
+    user: Annotated[UserRecord, Depends(require_learner_access)],
 ) -> ShadowingOut:
-    _, dialogue = _require_published_dialogue(dialogue_id)
+    case, dialogue = _require_published_dialogue(dialogue_id)
+    _assert_unlocked(user, case)
     lines = list(dialogue.payload.get("lines") or [])
     cards = build_shadowing_cards(lines, target=10)
     assert len(cards) == 10
@@ -394,15 +443,96 @@ def complete_lesson(
     user: Annotated[UserRecord, Depends(require_learner_access)],
 ) -> CompletionOut:
     case, dialogue = _require_published_dialogue(body.dialogue_id)
+    progress = get_progression_repository()
+    completed = progress.completed_case_ids(user.id)
+    cme_total = progress.cme_total(user.id)
+    rank_id, _ = rank_for_completions(len(completed))
+    decision = evaluate_unlock(
+        case=case,
+        completed_cases=completed,
+        cme_total=cme_total,
+        rank_id=rank_id,
+    )
+    if not decision.unlocked:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=decision.reason or "Case is locked",
+        )
     row = get_learner_profile_repository().mark_complete(
         user_id=user.id, case_id=case.id, dialogue_id=dialogue.id
     )
+    roleplay_bonus = False
+    for attempt in get_learning_attempt_repository().list_for_user(user.id):
+        if (
+            attempt.dialogue_id == dialogue.id
+            and attempt.mode == "role_play"
+            and attempt.score_json
+            and float(attempt.score_json.get("pronunciation") or 0)
+            >= ROLEPLAY_PA_THRESHOLD
+        ):
+            roleplay_bonus = True
+            break
+    awarded = progress.award_lesson_cme(
+        user_id=user.id,
+        case_id=case.id,
+        dialogue_id=dialogue.id,
+        roleplay_bonus=roleplay_bonus,
+    )
+    completed_after = progress.completed_case_ids(user.id)
+    new_rank_id, new_rank_label = rank_for_completions(len(completed_after))
+    certificate = None
+    if case.module_slug:
+        issued = progress.issue_module_certificate_if_eligible(
+            user_id=user.id,
+            module_slug=case.module_slug,
+            rank_id=new_rank_id,
+        )
+        if issued:
+            certificate = {
+                "id": issued.id,
+                "module_slug": issued.module_slug,
+                "title": issued.title,
+                "cme_points": issued.cme_points,
+                "share_slug": issued.share_slug,
+                "disclaimer": issued.disclaimer,
+            }
     return CompletionOut(
         id=row.id,
         case_id=row.case_id,
         dialogue_id=row.dialogue_id,
         completed_at=row.completed_at,
+        cme_awarded=sum(entry.points for entry in awarded),
+        rank_id=new_rank_id,
+        rank_label=new_rank_label,
+        certificate=certificate,
     )
+
+
+@router.get("/progression")
+def get_progression(
+    user: Annotated[UserRecord, Depends(require_learner_access)],
+) -> dict[str, Any]:
+    return progression_snapshot(
+        user_id=user.id, repo=get_progression_repository()
+    )
+
+
+@router.get("/certificates/{share_slug}")
+def get_shared_certificate(share_slug: str) -> dict[str, Any]:
+    cert = get_progression_repository().get_certificate_by_slug(share_slug)
+    if cert is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Certificate not found"
+        )
+    return {
+        "title": cert.title,
+        "module_slug": cert.module_slug,
+        "cme_points": cert.cme_points,
+        "rank_at_issue": cert.rank_at_issue,
+        "share_slug": cert.share_slug,
+        "disclaimer": cert.disclaimer,
+        "created_at": cert.created_at,
+    }
 
 
 @router.post("/attempts/audio", response_model=AttemptOut, status_code=201)

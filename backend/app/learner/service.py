@@ -6,6 +6,7 @@ from app.auth.settings import get_auth_settings
 from app.learner.attempts import LearningAttemptRepository
 from app.learner.empathy import EmpathyEngine, get_default_empathy
 from app.learner.profiles import LearnerProfileRepository
+from app.learner.progression import ProgressionRepository
 from app.learner.pronunciation import PronunciationEngine, get_default_pa
 from app.learner.rate_limit import PaRateLimiter
 from app.learner.srs import SrsRepository
@@ -32,6 +33,11 @@ def get_srs_repository() -> SrsRepository:
     return SrsRepository(get_auth_settings().database_path)
 
 
+@lru_cache
+def get_progression_repository() -> ProgressionRepository:
+    return ProgressionRepository(get_auth_settings().database_path)
+
+
 def get_pronunciation_engine() -> PronunciationEngine:
     settings = get_auth_settings()
     return get_default_pa(
@@ -54,3 +60,4 @@ def clear_learner_caches() -> None:
     get_learning_attempt_repository.cache_clear()
     get_pa_rate_limiter.cache_clear()
     get_srs_repository.cache_clear()
+    get_progression_repository.cache_clear()

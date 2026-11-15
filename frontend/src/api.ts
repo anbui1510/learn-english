@@ -93,6 +93,10 @@ export type CaseDraft = {
   extract_error: string | null
   published_at: string | null
   published_by_user_id: number | null
+  module_slug?: string | null
+  unlock_cme_points?: number
+  unlock_rank?: string | null
+  unlock_requires_case_id?: number | null
 }
 
 export type ClinicalFact = {
@@ -302,6 +306,25 @@ export type PublishedCase = {
   isbn: string | null
   edition: string | null
   published_at: string | null
+  module_slug?: string | null
+  unlocked?: boolean
+  unlock_reason?: string | null
+}
+
+export type Progression = {
+  rank_id: string
+  rank_label: string
+  cases_completed: number
+  cme_points: number
+  certificates: {
+    id: number
+    module_slug: string
+    title: string
+    cme_points: number
+    share_slug: string
+    disclaimer: string
+  }[]
+  ranks: { id: string; label: string; cases_required: number }[]
 }
 
 export type WordStamp = {
@@ -432,7 +455,11 @@ export async function patchLearnerProfile(body: {
   return (await response.json()) as LearnerProfile
 }
 
-export async function completeLesson(dialogueId: number): Promise<void> {
+export async function completeLesson(dialogueId: number): Promise<{
+  cme_awarded: number
+  rank_label?: string | null
+  certificate?: { share_slug: string; title: string } | null
+}> {
   const response = await fetch(`${API_BASE}/learner/completions`, {
     method: 'POST',
     credentials: 'include',
@@ -442,6 +469,43 @@ export async function completeLesson(dialogueId: number): Promise<void> {
   if (!response.ok) {
     throw new Error(`Failed to complete lesson (${response.status})`)
   }
+  return (await response.json()) as {
+    cme_awarded: number
+    rank_label?: string | null
+    certificate?: { share_slug: string; title: string } | null
+  }
+}
+
+export async function fetchProgression(): Promise<Progression> {
+  const response = await fetch(`${API_BASE}/learner/progression`, {
+    credentials: 'include',
+  })
+  if (!response.ok) {
+    throw new Error(`Failed to load progression (${response.status})`)
+  }
+  return (await response.json()) as Progression
+}
+
+export async function patchCaseProgression(
+  caseId: number,
+  body: {
+    module_slug?: string | null
+    unlock_cme_points?: number
+    unlock_rank?: string | null
+    unlock_requires_case_id?: number | null
+    clear_unlock_requires_case?: boolean
+  },
+): Promise<CaseDraft> {
+  const response = await fetch(`${API_BASE}/editor/cases/${caseId}/progression`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!response.ok) {
+    throw new Error(`Failed to update progression (${response.status})`)
+  }
+  return (await response.json()) as CaseDraft
 }
 
 export type WordBand = 'green' | 'yellow' | 'red'

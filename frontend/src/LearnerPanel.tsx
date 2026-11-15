@@ -4,6 +4,7 @@ import {
   completeSrsCard,
   fetchLearnerProfile,
   fetchLesson,
+  fetchProgression,
   fetchShadowing,
   fetchSrsQueue,
   listLearnerCaseDialogues,
@@ -14,6 +15,7 @@ import {
   type CefrLevel,
   type EmpathyScore,
   type Lesson,
+  type Progression,
   type PublishedCase,
   type ShadowingCard,
   type SrsCard,
@@ -52,6 +54,7 @@ export function LearnerPanel({ onError }: Props) {
     'read_along',
   )
   const [srsCards, setSrsCards] = useState<SrsCard[]>([])
+  const [progression, setProgression] = useState<Progression | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const mediaChunksRef = useRef<Blob[]>([])
@@ -75,17 +78,20 @@ export function LearnerPanel({ onError }: Props) {
     let cancelled = false
     ;(async () => {
       try {
-        const [listed, profile, queue] = await Promise.all([
+        const [listed, profile, queue, prog] = await Promise.all([
           listPublishedCases(),
           fetchLearnerProfile(),
           fetchSrsQueue(1),
+          fetchProgression(),
         ])
         if (cancelled) return
         setCases(listed)
         setLessonsPerWeek(profile.lessons_per_week)
         setCefrPackage(profile.cefr_package)
         setSrsCards(queue)
-        if (listed.length > 0) setCaseId(listed[0].id)
+        setProgression(prog)
+        const firstOpen = listed.find((c) => c.unlocked !== false)
+        if (firstOpen) setCaseId(firstOpen.id)
       } catch (err) {
         if (!cancelled) {
           onError(
@@ -198,8 +204,17 @@ export function LearnerPanel({ onError }: Props) {
     if (dialogueId == null) return
     onError(null)
     try {
-      await completeLesson(dialogueId)
-      setNote('Lesson marked complete')
+      const result = await completeLesson(dialogueId)
+      const prog = await fetchProgression()
+      setProgression(prog)
+      const listed = await listPublishedCases()
+      setCases(listed)
+      const bits = [`+${result.cme_awarded} CME`]
+      if (result.rank_label) bits.push(result.rank_label)
+      if (result.certificate?.share_slug) {
+        bits.push(`cert ${result.certificate.share_slug}`)
+      }
+      setNote(`Lesson complete · ${bits.join(' · ')}`)
     } catch (err) {
       onError(err instanceof Error ? err.message : 'Failed to complete')
     }
@@ -303,6 +318,25 @@ export function LearnerPanel({ onError }: Props) {
         Browse published cases, karaoke with word sync, then 10 shadowing cards.
       </p>
 
+      {progression ? (
+        <div className="mt-4 text-sm text-slate-700">
+          <p>
+            Rank: <span className="font-medium">{progression.rank_label}</span>
+            {' · '}
+            {progression.cases_completed} cases · {progression.cme_points} CME
+          </p>
+          {progression.certificates.length > 0 ? (
+            <ul className="mt-1 text-xs text-slate-500">
+              {progression.certificates.map((cert) => (
+                <li key={cert.id}>
+                  {cert.title} — share `{cert.share_slug}`
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="mt-4 grid gap-3 text-sm">
         <label>
           Lessons / week
@@ -350,8 +384,9 @@ export function LearnerPanel({ onError }: Props) {
               onChange={(e) => setCaseId(Number(e.target.value))}
             >
               {cases.map((c) => (
-                <option key={c.id} value={c.id}>
+                <option key={c.id} value={c.id} disabled={c.unlocked === false}>
                   #{c.id} — {c.title}
+                  {c.unlocked === false ? ` (locked: ${c.unlock_reason})` : ''}
                 </option>
               ))}
             </select>

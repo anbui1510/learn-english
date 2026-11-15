@@ -42,10 +42,15 @@ CREATE TABLE IF NOT EXISTS cases (
     extract_finished_at TEXT,
     published_at TEXT,
     published_by_user_id INTEGER,
+    module_slug TEXT,
+    unlock_cme_points INTEGER NOT NULL DEFAULT 0,
+    unlock_rank TEXT,
+    unlock_requires_case_id INTEGER,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     FOREIGN KEY(owner_user_id) REFERENCES users(id),
-    FOREIGN KEY(published_by_user_id) REFERENCES users(id)
+    FOREIGN KEY(published_by_user_id) REFERENCES users(id),
+    FOREIGN KEY(unlock_requires_case_id) REFERENCES cases(id)
 );
 
 CREATE TABLE IF NOT EXISTS facts (
@@ -171,6 +176,33 @@ CREATE TABLE IF NOT EXISTS srs_cards (
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY(source_attempt_id) REFERENCES learning_attempts(id) ON DELETE SET NULL
 );
+
+CREATE TABLE IF NOT EXISTS cme_ledger (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    case_id INTEGER NOT NULL,
+    dialogue_id INTEGER NOT NULL,
+    points INTEGER NOT NULL,
+    reason TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(case_id) REFERENCES cases(id) ON DELETE CASCADE,
+    FOREIGN KEY(dialogue_id) REFERENCES dialogues(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS certificates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    module_slug TEXT NOT NULL,
+    title TEXT NOT NULL,
+    cme_points INTEGER NOT NULL,
+    rank_at_issue TEXT NOT NULL,
+    share_slug TEXT NOT NULL UNIQUE,
+    disclaimer TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(user_id, module_slug),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
 """
 
 _ATTEMPT_COLUMNS: dict[str, str] = {
@@ -192,6 +224,10 @@ _CASE_COLUMNS: dict[str, str] = {
     "extract_finished_at": "TEXT",
     "published_at": "TEXT",
     "published_by_user_id": "INTEGER",
+    "module_slug": "TEXT",
+    "unlock_cme_points": "INTEGER NOT NULL DEFAULT 0",
+    "unlock_rank": "TEXT",
+    "unlock_requires_case_id": "INTEGER",
 }
 
 

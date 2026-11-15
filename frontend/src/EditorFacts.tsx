@@ -6,6 +6,7 @@ import {
   listCaseFacts,
   listMyCases,
   patchCaseFact,
+  patchCaseProgression,
   publishCase,
   startExtract,
   synthesizeDialogue,
@@ -53,6 +54,10 @@ export function EditorFacts({ onError }: Props) {
   const [includeVi, setIncludeVi] = useState(false)
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<string | null>(null)
+  const [moduleSlug, setModuleSlug] = useState('')
+  const [unlockCme, setUnlockCme] = useState(0)
+  const [unlockRank, setUnlockRank] = useState('')
+  const [unlockRequiresCaseId, setUnlockRequiresCaseId] = useState('')
 
   const refreshCases = useCallback(async () => {
     const listed = await listMyCases()
@@ -128,6 +133,18 @@ export function EditorFacts({ onError }: Props) {
 
   const selected = cases.find((c) => c.id === selectedId) ?? null
 
+  useEffect(() => {
+    if (!selected) return
+    setModuleSlug(selected.module_slug ?? '')
+    setUnlockCme(selected.unlock_cme_points ?? 0)
+    setUnlockRank(selected.unlock_rank ?? '')
+    setUnlockRequiresCaseId(
+      selected.unlock_requires_case_id != null
+        ? String(selected.unlock_requires_case_id)
+        : '',
+    )
+  }, [selected])
+
   function toggleContext(context: DialogueContext) {
     setContexts((prev) =>
       prev.includes(context)
@@ -171,6 +188,28 @@ export function EditorFacts({ onError }: Props) {
       await refreshCases()
     } catch (err) {
       onError(err instanceof Error ? err.message : 'Fact update failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onSaveProgression() {
+    if (selectedId == null) return
+    setBusy(true)
+    onError(null)
+    try {
+      const reqId = unlockRequiresCaseId.trim()
+      await patchCaseProgression(selectedId, {
+        module_slug: moduleSlug.trim() || null,
+        unlock_cme_points: unlockCme,
+        unlock_rank: unlockRank || null,
+        unlock_requires_case_id: reqId ? Number(reqId) : null,
+        clear_unlock_requires_case: !reqId,
+      })
+      await refreshCases()
+      setNote('Progression rules saved')
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Progression update failed')
     } finally {
       setBusy(false)
     }
@@ -251,6 +290,7 @@ export function EditorFacts({ onError }: Props) {
           </label>
 
           {selected ? (
+            <>
             <p className="text-sm text-slate-500">
               Extract: {selected.extract_status}
               {selected.extract_error ? ` — ${selected.extract_error}` : ''}
@@ -258,6 +298,60 @@ export function EditorFacts({ onError }: Props) {
                 ? ` · published ${selected.published_at}`
                 : ''}
             </p>
+            <div className="grid gap-2 rounded border border-slate-200 p-3 text-sm sm:grid-cols-2">
+              <label>
+                Module slug
+                <input
+                  className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+                  value={moduleSlug}
+                  onChange={(e) => setModuleSlug(e.target.value)}
+                  placeholder="peds-respiratory"
+                />
+              </label>
+              <label>
+                Unlock CME points
+                <input
+                  type="number"
+                  min={0}
+                  className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+                  value={unlockCme}
+                  onChange={(e) => setUnlockCme(Number(e.target.value))}
+                />
+              </label>
+              <label>
+                Unlock rank
+                <select
+                  className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+                  value={unlockRank}
+                  onChange={(e) => setUnlockRank(e.target.value)}
+                >
+                  <option value="">None</option>
+                  <option value="intern">Intern</option>
+                  <option value="resident">Resident</option>
+                  <option value="fellow">Fellow</option>
+                  <option value="attending">Attending</option>
+                  <option value="chief_of_staff">Chief of Staff</option>
+                </select>
+              </label>
+              <label>
+                Requires case id
+                <input
+                  className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+                  value={unlockRequiresCaseId}
+                  onChange={(e) => setUnlockRequiresCaseId(e.target.value)}
+                  placeholder="optional"
+                />
+              </label>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void onSaveProgression()}
+                className="sm:col-span-2 w-fit rounded-md border border-slate-300 px-3 py-1.5 disabled:opacity-50"
+              >
+                Save unlock rules
+              </button>
+            </div>
+            </>
           ) : null}
 
           <div className="flex flex-wrap gap-2">
