@@ -20,6 +20,9 @@ class CaseRecord:
     status: CaseStatus
     isbn: str | None
     edition: str | None
+    pdf_object_key: str | None
+    pdf_content_type: str | None
+    pdf_byte_size: int | None
     created_at: str
     updated_at: str
 
@@ -29,6 +32,7 @@ def _now() -> str:
 
 
 def _row_to_case(row: sqlite3.Row) -> CaseRecord:
+    keys = row.keys()
     return CaseRecord(
         id=row["id"],
         owner_user_id=row["owner_user_id"],
@@ -36,6 +40,11 @@ def _row_to_case(row: sqlite3.Row) -> CaseRecord:
         status=row["status"],
         isbn=row["isbn"],
         edition=row["edition"],
+        pdf_object_key=row["pdf_object_key"] if "pdf_object_key" in keys else None,
+        pdf_content_type=(
+            row["pdf_content_type"] if "pdf_content_type" in keys else None
+        ),
+        pdf_byte_size=row["pdf_byte_size"] if "pdf_byte_size" in keys else None,
         created_at=row["created_at"],
         updated_at=row["updated_at"],
     )
@@ -57,6 +66,9 @@ class CaseRepository:
         title: str,
         isbn: str | None = None,
         edition: str | None = None,
+        pdf_object_key: str | None = None,
+        pdf_content_type: str | None = None,
+        pdf_byte_size: int | None = None,
     ) -> CaseRecord:
         assert_can_own_case(owner)
         title_clean = title.strip()
@@ -66,11 +78,24 @@ class CaseRepository:
         with self._conn() as conn:
             cur = conn.execute(
                 """
-                INSERT INTO cases
-                    (owner_user_id, title, status, isbn, edition, created_at, updated_at)
-                VALUES (?, ?, 'draft', ?, ?, ?, ?)
+                INSERT INTO cases (
+                    owner_user_id, title, status, isbn, edition,
+                    pdf_object_key, pdf_content_type, pdf_byte_size,
+                    created_at, updated_at
+                )
+                VALUES (?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (owner.id, title_clean, isbn, edition, now, now),
+                (
+                    owner.id,
+                    title_clean,
+                    isbn,
+                    edition,
+                    pdf_object_key,
+                    pdf_content_type,
+                    pdf_byte_size,
+                    now,
+                    now,
+                ),
             )
             case_id = int(cur.lastrowid)
             conn.commit()
@@ -107,7 +132,6 @@ class CaseRepository:
         case_id: int,
         new_owner: UserRecord,
     ) -> CaseRecord:
-        """Reassign ownership; rejects learners via assert_can_own_case."""
         assert_can_own_case(new_owner)
         now = _now()
         with self._conn() as conn:

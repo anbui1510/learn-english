@@ -5,6 +5,9 @@
   "status": "draft",
   "isbn": "978-0-323-52950-1",
   "edition": "22e",
+  "pdf_object_key": "cases/42/sample.pdf",
+  "pdf_content_type": "application/pdf",
+  "pdf_byte_size": 2048,
   "created_at": "2026-11-15T00:00:00+00:00",
   "updated_at": "2026-11-15T00:00:00+00:00"
 }

@@ -12,6 +12,7 @@ _ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 load_dotenv(_ENV_FILE)
 
 _DEFAULT_DB = Path(__file__).resolve().parents[2] / "data" / "learn_english.sqlite3"
+_DEFAULT_STORAGE = Path(__file__).resolve().parents[2] / "data" / "objects"
 
 SameSite = Literal["lax", "strict", "none"]
 
@@ -30,6 +31,12 @@ class AuthSettings:
     cookie_samesite: SameSite
     database_path: str
     bootstrap_admin_emails: str
+    storage_root: str
+    gcs_bucket: str
+    gcs_location: str
+    api_public_base_url: str
+    pdf_max_bytes: int
+    signed_url_ttl_seconds: int
 
     @property
     def oauth_configured(self) -> bool:
@@ -72,6 +79,12 @@ def get_auth_settings() -> AuthSettings:
         cookie_samesite=_parse_samesite(_env("COOKIE_SAMESITE", "lax")),
         database_path=_env("DATABASE_PATH", str(_DEFAULT_DB)),
         bootstrap_admin_emails=_env("BOOTSTRAP_ADMIN_EMAILS"),
+        storage_root=_env("STORAGE_ROOT", str(_DEFAULT_STORAGE)),
+        gcs_bucket=_env("GCS_BUCKET"),
+        gcs_location=_env("GCS_LOCATION", "asia-southeast1"),
+        api_public_base_url=_env("API_PUBLIC_BASE_URL", "http://127.0.0.1:8000"),
+        pdf_max_bytes=int(_env("PDF_MAX_BYTES", str(25 * 1024 * 1024))),
+        signed_url_ttl_seconds=int(_env("SIGNED_URL_TTL_SECONDS", "300")),
     )
 
 

@@ -8,6 +8,7 @@ from app.auth.oauth import reset_oauth_registration
 from app.auth.settings import AuthSettings, clear_auth_settings_cache, get_auth_settings
 from app.cases.service import clear_case_repository_cache
 from app.main import create_app
+from app.storage.factory import clear_storage_cache
 from app.users.repository import UserRecord
 from app.users.roles import Role
 from app.users.service import clear_user_repository_cache
@@ -17,6 +18,7 @@ def _clear_all_caches() -> None:
     clear_auth_settings_cache()
     clear_user_repository_cache()
     clear_case_repository_cache()
+    clear_storage_cache()
     reset_oauth_registration()
 
 
@@ -30,7 +32,10 @@ def _reset_caches() -> None:
 @pytest.fixture
 def tmp_db_path(tmp_path, monkeypatch: pytest.MonkeyPatch) -> str:
     db_path = str(tmp_path / "test.sqlite3")
+    storage_root = str(tmp_path / "objects")
     monkeypatch.setenv("DATABASE_PATH", db_path)
+    monkeypatch.setenv("STORAGE_ROOT", storage_root)
+    monkeypatch.delenv("GCS_BUCKET", raising=False)
     _clear_all_caches()
     return db_path
 
@@ -49,6 +54,9 @@ def auth_env(tmp_db_path: str, monkeypatch: pytest.MonkeyPatch) -> str:
     monkeypatch.setenv("COOKIE_NAME", "le_session")
     monkeypatch.setenv("COOKIE_SECURE", "false")
     monkeypatch.setenv("BOOTSTRAP_ADMIN_EMAILS", "admin@example.com")
+    monkeypatch.setenv("API_PUBLIC_BASE_URL", "http://testserver")
+    monkeypatch.setenv("PDF_MAX_BYTES", str(1024 * 1024))
+    monkeypatch.setenv("SIGNED_URL_TTL_SECONDS", "300")
     _clear_all_caches()
     return tmp_db_path
 
