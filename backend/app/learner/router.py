@@ -3,7 +3,9 @@ from __future__ import annotations
 import uuid
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from datetime import date, timedelta
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel, Field
 
 from app.auth.deps import require_learner_access
@@ -12,12 +14,15 @@ from app.cases.service import get_case_repository
 from app.dialogues.service import get_dialogue_repository
 from app.facts.service import get_fact_repository
 from app.learner.profiles import CefrPackage
+from app.learner.empathy import empathy_to_dict
 from app.learner.pronunciation import result_to_dict
 from app.learner.service import (
+    get_empathy_engine,
     get_learner_profile_repository,
     get_learning_attempt_repository,
     get_pa_rate_limiter,
     get_pronunciation_engine,
+    get_srs_repository,
 )
 from app.learner.shadowing import build_shadowing_cards
 from app.speech.service import get_utterance_repository
@@ -105,6 +110,14 @@ class ScoreOut(BaseModel):
     stress_hint: str | None = None
 
 
+class EmpathyOut(BaseModel):
+    engine: str
+    score: float
+    rubric: dict[str, float]
+    feedback: str
+    disclaimer: str
+
+
 class AttemptOut(BaseModel):
     id: int
     case_id: int
@@ -114,23 +127,38 @@ class AttemptOut(BaseModel):
     created_at: str
     line_index: int | None = None
     reference_text: str | None = None
+    response_mode: str = "read_along"
     score: ScoreOut | None = None
+    empathy: EmpathyOut | None = None
     scored_at: str | None = None
     pa_usage: dict[str, int] | None = None
+    srs_enqueued: int = 0
 
 
 class ScoreAttemptIn(BaseModel):
     line_index: int = Field(default=0, ge=0)
 
 
+class SrsCardOut(BaseModel):
+    id: int
+    phrase: str
+    band: str
+    due_at: str
+    source_attempt_id: int | None = None
+
+
 def _attempt_out(
     attempt,
     *,
     pa_usage: dict[str, int] | None = None,
+    srs_enqueued: int = 0,
 ) -> AttemptOut:
     score = None
     if attempt.score_json:
         score = ScoreOut.model_validate(attempt.score_json)
+    empathy = None
+    if attempt.empathy_json:
+        empathy = EmpathyOut.model_validate(attempt.empathy_json)
     return AttemptOut(
         id=attempt.id,
         case_id=attempt.case_id,
@@ -140,10 +168,38 @@ def _attempt_out(
         created_at=attempt.created_at,
         line_index=attempt.line_index,
         reference_text=attempt.reference_text,
+        response_mode=attempt.response_mode,
         score=score,
+        empathy=empathy,
         scored_at=attempt.scored_at,
         pa_usage=pa_usage,
+        srs_enqueued=srs_enqueued,
     )
+
+
+def _apply_score_side_effects(
+    *,
+    user_id: int,
+    attempt_id: int,
+    score: dict[str, Any],
+    response_mode: str,
+    reference_text: str,
+    audio: bytes,
+) -> tuple[dict[str, Any] | None, int]:
+    empathy_payload: dict[str, Any] | None = None
+    if response_mode == "free_speech":
+        empathy_payload = empathy_to_dict(
+            get_empathy_engine().score(
+                transcript_or_context=reference_text,
+                audio_len=len(audio),
+            )
+        )
+    cards = get_srs_repository().enqueue_from_score(
+        user_id=user_id,
+        attempt_id=attempt_id,
+        score=score,
+    )
+    return empathy_payload, len(cards)
 
 
 def _line_reference(dialogue, line_index: int) -> tuple[str, list[int] | None]:
@@ -357,6 +413,9 @@ async def upload_attempt_audio(
     file: Annotated[UploadFile, File()],
     line_index: Annotated[int, Form()] = 0,
     score: Annotated[bool, Form()] = True,
+    response_mode: Annotated[
+        Literal["read_along", "free_speech"], Form()
+    ] = "read_along",
 ) -> AttemptOut:
     case, dialogue = _require_published_dialogue(dialogue_id)
     data = await file.read()
@@ -387,7 +446,9 @@ async def upload_attempt_audio(
         audio_content_type=stored.content_type,
         line_index=line_index,
         reference_text=reference_text,
+        response_mode=response_mode,
     )
+    srs_enqueued = 0
     if score:
         result = get_pronunciation_engine().assess(
             audio=data,
@@ -395,13 +456,23 @@ async def upload_attempt_audio(
             cefr_level=dialogue.cefr_level,
             stress_pattern=stress,
         )
+        score_payload = result_to_dict(result)
+        empathy_payload, srs_enqueued = _apply_score_side_effects(
+            user_id=user.id,
+            attempt_id=attempt.id,
+            score=score_payload,
+            response_mode=response_mode,
+            reference_text=reference_text,
+            audio=data,
+        )
         attempt = repo.save_score(
             attempt_id=attempt.id,
-            score=result_to_dict(result),
+            score=score_payload,
             line_index=line_index,
             reference_text=reference_text,
+            empathy=empathy_payload,
         )
-    return _attempt_out(attempt, pa_usage=pa_usage)
+    return _attempt_out(attempt, pa_usage=pa_usage, srs_enqueued=srs_enqueued)
 
 
 @router.post("/attempts/{attempt_id}/score", response_model=AttemptOut)
@@ -438,10 +509,63 @@ def score_attempt(
         cefr_level=dialogue.cefr_level,
         stress_pattern=stress,
     )
+    score_payload = result_to_dict(result)
+    empathy_payload, srs_enqueued = _apply_score_side_effects(
+        user_id=user.id,
+        attempt_id=attempt.id,
+        score=score_payload,
+        response_mode=attempt.response_mode,
+        reference_text=reference_text,
+        audio=audio,
+    )
     updated = repo.save_score(
         attempt_id=attempt.id,
-        score=result_to_dict(result),
+        score=score_payload,
         line_index=body.line_index,
         reference_text=reference_text,
+        empathy=empathy_payload,
     )
-    return _attempt_out(updated, pa_usage={"used": used, "limit": limit})
+    return _attempt_out(
+        updated,
+        pa_usage={"used": used, "limit": limit},
+        srs_enqueued=srs_enqueued,
+    )
+
+
+@router.get("/srs/queue", response_model=list[SrsCardOut])
+def list_srs_queue(
+    user: Annotated[UserRecord, Depends(require_learner_access)],
+    horizon_days: Annotated[int, Query(ge=0, le=7)] = 1,
+) -> list[SrsCardOut]:
+    """Return incomplete SRS cards due on/before today+horizon (default T+1)."""
+    on_or_before = (date.today() + timedelta(days=horizon_days)).isoformat()
+    cards = get_srs_repository().list_due(user.id, on_or_before=on_or_before)
+    return [
+        SrsCardOut(
+            id=card.id,
+            phrase=card.phrase,
+            band=card.band,
+            due_at=card.due_at,
+            source_attempt_id=card.source_attempt_id,
+        )
+        for card in cards
+    ]
+
+
+@router.post("/srs/{card_id}/done", response_model=SrsCardOut)
+def complete_srs_card(
+    card_id: int,
+    user: Annotated[UserRecord, Depends(require_learner_access)],
+) -> SrsCardOut:
+    card = get_srs_repository().mark_done(card_id=card_id, user_id=user.id)
+    if card is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="SRS card not found"
+        )
+    return SrsCardOut(
+        id=card.id,
+        phrase=card.phrase,
+        band=card.band,
+        due_at=card.due_at,
+        source_attempt_id=card.source_attempt_id,
+    )

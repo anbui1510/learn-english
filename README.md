@@ -102,10 +102,14 @@ Roles persist in SQLite (`DATABASE_PATH`, default `backend/data/learn_english.sq
 | `POST` | `/learner/completions` | Mark karaoke+shadowing complete |
 | `POST` | `/learner/attempts/audio` | Upload LearningAttempt + optional PA score (synthetic default) |
 | `POST` | `/learner/attempts/{id}/score` | Re-score an attempt against a dialogue line (rate-limited) |
+| `GET` | `/learner/srs/queue` | Weak-phrase SRS cards due through T+1 (`horizon_days`) |
+| `POST` | `/learner/srs/{id}/done` | Mark an SRS card complete |
 
 TTS defaults to a silent-WAV synthetic engine (CI-safe). Set `USE_EDGE_TTS=true` and install optional `edge-tts` to use the async Edge adapter (falls back to synthetic on missing SDK/network errors).
 
 **Pha 2 pronunciation:** upload/score returns pronunciation / completeness / prosody plus per-word green/yellow/red bands. Default engine is synthetic (CI-safe). Set `USE_AZURE_PA=true` + `AZURE_SPEECH_KEY` (optional `uv sync --group speech`) for Azure; `PA_DAILY_LIMIT` caps score calls per user/day.
+
+**Pha 2 learning loop:** red/yellow PA words enqueue SRS cards for T+1. Role-play supports `read_along` vs `free_speech`; free speech adds synthetic empathy rubric + clinical disclaimer (`USE_GEMINI_EMPATHY` reserved).
 
 ### Google OAuth setup (manual verify)
 

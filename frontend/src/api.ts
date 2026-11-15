@@ -455,14 +455,33 @@ export type AttemptScore = {
   stress_hint?: string | null
 }
 
+export type EmpathyScore = {
+  engine: string
+  score: number
+  rubric: Record<string, number>
+  feedback: string
+  disclaimer: string
+}
+
 export type AttemptResult = {
   id: number
   case_id: number
   dialogue_id: number
   mode: string
+  response_mode?: string
   score?: AttemptScore | null
+  empathy?: EmpathyScore | null
   scored_at?: string | null
   pa_usage?: { used: number; limit: number } | null
+  srs_enqueued?: number
+}
+
+export type SrsCard = {
+  id: number
+  phrase: string
+  band: string
+  due_at: string
+  source_attempt_id?: number | null
 }
 
 export async function uploadAttemptAudio(input: {
@@ -471,12 +490,14 @@ export async function uploadAttemptAudio(input: {
   file: Blob
   lineIndex?: number
   score?: boolean
+  responseMode?: 'read_along' | 'free_speech'
 }): Promise<AttemptResult> {
   const body = new FormData()
   body.set('dialogue_id', String(input.dialogueId))
   body.set('mode', input.mode)
   body.set('line_index', String(input.lineIndex ?? 0))
   body.set('score', input.score === false ? 'false' : 'true')
+  body.set('response_mode', input.responseMode ?? 'read_along')
   body.set('file', input.file, 'attempt.webm')
   const response = await fetch(`${API_BASE}/learner/attempts/audio`, {
     method: 'POST',
@@ -487,4 +508,25 @@ export async function uploadAttemptAudio(input: {
     throw new Error(`Attempt upload failed (${response.status})`)
   }
   return (await response.json()) as AttemptResult
+}
+
+export async function fetchSrsQueue(horizonDays = 1): Promise<SrsCard[]> {
+  const response = await fetch(
+    `${API_BASE}/learner/srs/queue?horizon_days=${horizonDays}`,
+    { credentials: 'include' },
+  )
+  if (!response.ok) {
+    throw new Error(`Failed to load SRS queue (${response.status})`)
+  }
+  return (await response.json()) as SrsCard[]
+}
+
+export async function completeSrsCard(cardId: number): Promise<void> {
+  const response = await fetch(`${API_BASE}/learner/srs/${cardId}/done`, {
+    method: 'POST',
+    credentials: 'include',
+  })
+  if (!response.ok) {
+    throw new Error(`Failed to complete SRS card (${response.status})`)
+  }
 }

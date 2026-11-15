@@ -142,6 +142,9 @@ CREATE TABLE IF NOT EXISTS learning_attempts (
     reference_text TEXT,
     score_json TEXT,
     scored_at TEXT,
+    response_mode TEXT NOT NULL DEFAULT 'read_along'
+        CHECK(response_mode IN ('read_along', 'free_speech')),
+    empathy_json TEXT,
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY(case_id) REFERENCES cases(id) ON DELETE CASCADE,
     FOREIGN KEY(dialogue_id) REFERENCES dialogues(id) ON DELETE CASCADE
@@ -154,6 +157,20 @@ CREATE TABLE IF NOT EXISTS pa_score_usage (
     PRIMARY KEY (user_id, usage_day),
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS srs_cards (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    phrase TEXT NOT NULL,
+    source_attempt_id INTEGER,
+    band TEXT NOT NULL CHECK(band IN ('red', 'yellow')),
+    due_at TEXT NOT NULL,
+    done_at TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE(user_id, phrase),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(source_attempt_id) REFERENCES learning_attempts(id) ON DELETE SET NULL
+);
 """
 
 _ATTEMPT_COLUMNS: dict[str, str] = {
@@ -161,6 +178,8 @@ _ATTEMPT_COLUMNS: dict[str, str] = {
     "reference_text": "TEXT",
     "score_json": "TEXT",
     "scored_at": "TEXT",
+    "response_mode": "TEXT NOT NULL DEFAULT 'read_along'",
+    "empathy_json": "TEXT",
 }
 
 _CASE_COLUMNS: dict[str, str] = {

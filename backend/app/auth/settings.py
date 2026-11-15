@@ -43,6 +43,7 @@ class AuthSettings:
     azure_speech_region: str
     use_azure_pa: bool
     pa_daily_limit: int
+    use_gemini_empathy: bool
 
     @property
     def oauth_configured(self) -> bool:
@@ -97,6 +98,8 @@ def get_auth_settings() -> AuthSettings:
         azure_speech_region=_env("AZURE_SPEECH_REGION", "eastasia"),
         use_azure_pa=_env("USE_AZURE_PA", "false").lower() in {"1", "true", "yes"},
         pa_daily_limit=int(_env("PA_DAILY_LIMIT", "50")),
+        use_gemini_empathy=_env("USE_GEMINI_EMPATHY", "false").lower()
+        in {"1", "true", "yes"},
     )
 
 

@@ -1,18 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   completeLesson,
+  completeSrsCard,
   fetchLearnerProfile,
   fetchLesson,
   fetchShadowing,
+  fetchSrsQueue,
   listLearnerCaseDialogues,
   listPublishedCases,
   patchLearnerProfile,
   uploadAttemptAudio,
   type AttemptScore,
   type CefrLevel,
+  type EmpathyScore,
   type Lesson,
   type PublishedCase,
   type ShadowingCard,
+  type SrsCard,
 } from './api'
 
 type Props = {
@@ -43,6 +47,11 @@ export function LearnerPanel({ onError }: Props) {
   const [recording, setRecording] = useState(false)
   const [uploadingAttempt, setUploadingAttempt] = useState(false)
   const [lastScore, setLastScore] = useState<AttemptScore | null>(null)
+  const [lastEmpathy, setLastEmpathy] = useState<EmpathyScore | null>(null)
+  const [responseMode, setResponseMode] = useState<'read_along' | 'free_speech'>(
+    'read_along',
+  )
+  const [srsCards, setSrsCards] = useState<SrsCard[]>([])
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const mediaChunksRef = useRef<Blob[]>([])
@@ -57,18 +66,25 @@ export function LearnerPanel({ onError }: Props) {
       : 'text-teal-800'
   }, [current])
 
+  async function refreshSrs() {
+    const queue = await fetchSrsQueue(1)
+    setSrsCards(queue)
+  }
+
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
-        const [listed, profile] = await Promise.all([
+        const [listed, profile, queue] = await Promise.all([
           listPublishedCases(),
           fetchLearnerProfile(),
+          fetchSrsQueue(1),
         ])
         if (cancelled) return
         setCases(listed)
         setLessonsPerWeek(profile.lessons_per_week)
         setCefrPackage(profile.cefr_package)
+        setSrsCards(queue)
         if (listed.length > 0) setCaseId(listed[0].id)
       } catch (err) {
         if (!cancelled) {
@@ -249,12 +265,19 @@ export function LearnerPanel({ onError }: Props) {
               file: blob,
               lineIndex,
               score: true,
+              responseMode,
             })
             setLastScore(result.score ?? null)
+            setLastEmpathy(result.empathy ?? null)
+            await refreshSrs()
             const pa = result.score
+            const srsNote =
+              (result.srs_enqueued ?? 0) > 0
+                ? ` · ${result.srs_enqueued} SRS card(s) queued for T+1`
+                : ''
             setNote(
               pa
-                ? `PA ${pa.engine}: pronunciation ${pa.pronunciation} · completeness ${pa.completeness} · prosody ${pa.prosody}`
+                ? `PA ${pa.engine}: pronunciation ${pa.pronunciation} · completeness ${pa.completeness} · prosody ${pa.prosody}${srsNote}`
                 : 'Attempt audio saved without score',
             )
           } catch (err) {
@@ -457,7 +480,27 @@ export function LearnerPanel({ onError }: Props) {
           </div>
 
           <div className="mt-6 border-t border-slate-200 pt-4">
-            <h3 className="text-base font-semibold">Role-play (placeholder)</h3>
+            <h3 className="text-base font-semibold">Role-play</h3>
+            <div className="mt-2 flex flex-wrap gap-3 text-sm">
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="response-mode"
+                  checked={responseMode === 'read_along'}
+                  onChange={() => setResponseMode('read_along')}
+                />
+                Read-along
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="response-mode"
+                  checked={responseMode === 'free_speech'}
+                  onChange={() => setResponseMode('free_speech')}
+                />
+                Free response (+ empathy)
+              </label>
+            </div>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <div className="border-l-2 border-teal-600 pl-3 text-sm">
                 <p className="font-medium">AI script</p>
@@ -468,7 +511,9 @@ export function LearnerPanel({ onError }: Props) {
               <div className="border-l-2 border-orange-500 pl-3 text-sm">
                 <p className="font-medium">Your mic</p>
                 <p className="mt-1 text-slate-500">
-                  Read the script, then record. Word colors: green / yellow / red.
+                  {responseMode === 'read_along'
+                    ? 'Match the script. Word colors: green / yellow / red.'
+                    : 'Respond freely. Empathy rubric applies (practice aid only).'}
                 </p>
                 <button
                   type="button"
@@ -509,8 +554,71 @@ export function LearnerPanel({ onError }: Props) {
                     </p>
                   </div>
                 ) : null}
+                {lastEmpathy ? (
+                  <div className="mt-3 text-sm">
+                    <p className="font-medium">
+                      Empathy {lastEmpathy.score} ({lastEmpathy.engine})
+                    </p>
+                    <p className="mt-1 text-slate-600">{lastEmpathy.feedback}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {lastEmpathy.disclaimer}
+                    </p>
+                  </div>
+                ) : null}
               </div>
             </div>
+          </div>
+
+          <div className="mt-6 border-t border-slate-200 pt-4">
+            <h3 className="text-base font-semibold">SRS queue (T+1)</h3>
+            <p className="mt-1 text-sm text-slate-500">
+              Weak words from PA land here for review the next day.
+            </p>
+            {srsCards.length === 0 ? (
+              <p className="mt-2 text-sm text-slate-500">No cards due yet.</p>
+            ) : (
+              <ul className="mt-3 space-y-2">
+                {srsCards.map((card) => (
+                  <li
+                    key={card.id}
+                    className="flex items-center justify-between gap-3 text-sm"
+                  >
+                    <span>
+                      <span
+                        className={
+                          card.band === 'red' ? 'text-red-600' : 'text-amber-600'
+                        }
+                      >
+                        {card.phrase}
+                      </span>
+                      <span className="ml-2 text-xs text-slate-500">
+                        due {card.due_at}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      className="underline"
+                      onClick={() => {
+                        void (async () => {
+                          try {
+                            await completeSrsCard(card.id)
+                            await refreshSrs()
+                          } catch (err) {
+                            onError(
+                              err instanceof Error
+                                ? err.message
+                                : 'Failed to complete card',
+                            )
+                          }
+                        })()
+                      }}
+                    >
+                      Done
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <button
