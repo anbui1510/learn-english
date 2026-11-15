@@ -123,7 +123,7 @@ TTS defaults to a silent-WAV synthetic engine (CI-safe). Set `USE_EDGE_TTS=true`
 
 **Pha 3 book sources:** `book_sources` seeds Nelson / Harriet Lane / WHO; admins CRUD via `/admin/book-sources`; editors tag cases on upload (`book_source_id`) while facts keep per-case ISBN metadata.
 
-**Pha 3 video export:** `POST /learner/dialogues/{id}/export-video` queues a 1920×1080 MP4 job (ffmpeg karaoke compose today; Remotion stub under `video/remotion/` for later swap).
+**Pha 3 video export:** `POST /learner/dialogues/{id}/export-video` with `engine=ffmpeg|remotion` renders 1920×1080 MP4. Remotion composition lives in `video/remotion/`; unavailable CLI falls back to ffmpeg.
 
 **Pha 3 premium TTS:** org `tts_provider` + `premium_enabled` cost flag (`/admin/tts-settings`). Providers: synthetic / edge / Azure Neural / ElevenLabs (keys via env; premium gate required for paid engines).
 

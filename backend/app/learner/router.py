@@ -713,6 +713,10 @@ def _video_export_out(job) -> VideoExportOut:
     )
 
 
+class VideoExportIn(BaseModel):
+    engine: Literal["ffmpeg", "remotion"] = "ffmpeg"
+
+
 @router.post(
     "/dialogues/{dialogue_id}/export-video",
     response_model=VideoExportOut,
@@ -721,10 +725,12 @@ def _video_export_out(job) -> VideoExportOut:
 def enqueue_video_export(
     dialogue_id: int,
     user: Annotated[UserRecord, Depends(require_learner_access)],
+    body: VideoExportIn | None = None,
 ) -> VideoExportOut:
-    """Queue a 1080p karaoke/shadowing MP4 export (ffmpeg now; Remotion-ready)."""
+    """Queue a 1080p karaoke/shadowing MP4 export (ffmpeg or Remotion)."""
     from app.video.service import get_video_export_repository, run_export_job
 
+    preferred = (body.engine if body else "ffmpeg")
     case, dialogue = _require_published_dialogue(dialogue_id)
     _assert_unlocked(user, case)
     job = get_video_export_repository().create(
@@ -733,10 +739,10 @@ def enqueue_video_export(
         case_id=case.id,
         width=1920,
         height=1080,
-        engine="ffmpeg",
+        engine=preferred,
     )
     # MVP: process inline so CI/demo do not need a worker process.
-    finished = run_export_job(job.id)
+    finished = run_export_job(job.id, preferred_engine=preferred)
     return _video_export_out(finished)
 
 

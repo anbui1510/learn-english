@@ -1,14 +1,19 @@
 # Remotion karaoke composition (G3)
 
-Placeholder for a Remotion composition that reuses learner karaoke timestamps
-(`playlist[].timestamps`) and line audio URLs.
+Composition id: **Karaoke** (`src/KaraokeComposition.tsx`).
 
-The production export API today renders via **ffmpeg** (`backend/app/video/export.py`)
-so CI stays dependency-light. Swap `engine` to `remotion` when this package is wired
-into the export worker.
+## Local render
 
-Suggested props:
+```bash
+cd video/remotion
+npm install
+npm run studio
+# or
+npx remotion render src/index.ts Karaoke out/karaoke.mp4 --props=./sample-props.json
+```
 
-- `title`
-- `lines: { speaker, text, audioUrl, timestamps }[]`
-- `width: 1920`, `height: 1080`
+Backend export prefers this path when `engine=remotion` is requested
+(`POST /learner/dialogues/{id}/export-video`). If Remotion/CLI is unavailable,
+the job falls back to the ffmpeg karaoke composer and records `engine=ffmpeg`.
+
+CI keeps using ffmpeg so the main workflow stays dependency-light.

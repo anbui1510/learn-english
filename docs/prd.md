@@ -309,7 +309,7 @@ Web app giúp **bác sĩ nội trú** luyện tiếng Anh giao tiếp y khoa t�
 
 | ID | User Story | Acceptance Criteria |
 |----|------------|---------------------|
-| US-G3-010 | Là **learner/editor**, tôi xuất **MP4 1080p** từ karaoke + shadowing, để chia sẻ đồng nghiệp. | Remotion composition reuse; `POST /api/export-video`; queue job. |
+| US-G3-010 | Là **learner/editor**, tôi xuất **MP4 1080p** từ karaoke + shadowing, để chia sẻ đồng nghiệp. | Remotion composition (`video/remotion`) + ffmpeg fallback; `POST /learner/dialogues/{id}/export-video`; job status. |
 
 ### Epic E-G3-03: Multi-source library
 

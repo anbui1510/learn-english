@@ -102,16 +102,29 @@ class VideoExportRepository:
         assert job is not None
         return job
 
-    def mark_succeeded(self, job_id: int, *, object_key: str) -> VideoExportJob:
+    def mark_succeeded(
+        self, job_id: int, *, object_key: str, engine: str | None = None
+    ) -> VideoExportJob:
         with self._conn() as conn:
-            conn.execute(
-                """
-                UPDATE video_exports
-                SET status = 'succeeded', object_key = ?, error = NULL, finished_at = ?
-                WHERE id = ?
-                """,
-                (object_key, _now(), job_id),
-            )
+            if engine is not None:
+                conn.execute(
+                    """
+                    UPDATE video_exports
+                    SET status = 'succeeded', object_key = ?, error = NULL,
+                        finished_at = ?, engine = ?
+                    WHERE id = ?
+                    """,
+                    (object_key, _now(), engine, job_id),
+                )
+            else:
+                conn.execute(
+                    """
+                    UPDATE video_exports
+                    SET status = 'succeeded', object_key = ?, error = NULL, finished_at = ?
+                    WHERE id = ?
+                    """,
+                    (object_key, _now(), job_id),
+                )
             conn.commit()
         job = self.get(job_id)
         assert job is not None

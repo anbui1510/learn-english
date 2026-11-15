@@ -265,7 +265,7 @@ export function LearnerPanel({ onError }: Props) {
     onError(null)
     try {
       setNote('Exporting 1080p MP4…')
-      const job = await exportDialogueVideo(dialogueId)
+      const job = await exportDialogueVideo(dialogueId, 'remotion')
       if (job.status === 'succeeded' && job.download_url) {
         setNote(`Export ready (${job.width}×${job.height}, ${job.engine})`)
         window.open(job.download_url, '_blank', 'noopener,noreferrer')

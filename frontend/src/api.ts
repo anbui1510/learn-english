@@ -825,10 +825,16 @@ export type VideoExportJob = {
 
 export async function exportDialogueVideo(
   dialogueId: number,
+  engine: 'ffmpeg' | 'remotion' = 'ffmpeg',
 ): Promise<VideoExportJob> {
   const response = await fetch(
     `${API_BASE}/learner/dialogues/${dialogueId}/export-video`,
-    { method: 'POST', credentials: 'include' },
+    {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ engine }),
+    },
   )
   if (!response.ok) {
     throw new Error(`Video export failed (${response.status})`)
