@@ -21,6 +21,8 @@ type Props = {
   onError: (message: string | null) => void
   /** When set after upload, refresh the case list and select this id. */
   focusCaseId?: number | null
+  /** Notify parent after publish so Learner practice can reload. */
+  onCasePublished?: (caseId: number) => void
 }
 
 const ALL_CONTEXTS: DialogueContext[] = [
@@ -43,7 +45,11 @@ async function waitForExtract(caseId: number): Promise<CaseDraft> {
   return getCase(caseId)
 }
 
-export function EditorFacts({ onError, focusCaseId = null }: Props) {
+export function EditorFacts({
+  onError,
+  focusCaseId = null,
+  onCasePublished,
+}: Props) {
   const [cases, setCases] = useState<CaseDraft[]>([])
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [facts, setFacts] = useState<ClinicalFact[]>([])
@@ -262,6 +268,7 @@ export function EditorFacts({ onError, focusCaseId = null }: Props) {
       const draft = await publishCase(selectedId)
       setNote(`Case #${draft.id} published`)
       await refreshCases()
+      onCasePublished?.(draft.id)
     } catch (err) {
       onError(err instanceof Error ? err.message : 'Publish failed')
     } finally {

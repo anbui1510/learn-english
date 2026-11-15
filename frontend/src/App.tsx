@@ -22,6 +22,7 @@ function App() {
   )
   const [showCert, setShowCert] = useState(Boolean(certSlug))
   const [editorCaseId, setEditorCaseId] = useState<number | null>(null)
+  const [learnerRefreshKey, setLearnerRefreshKey] = useState(0)
   const native = useMemo(() => isNativePlatform(), [])
 
   const handleError = useCallback((message: string | null) => {
@@ -30,6 +31,10 @@ function App() {
 
   const handleCaseUploaded = useCallback((draft: CaseDraft) => {
     setEditorCaseId(draft.id)
+  }, [])
+
+  const handleCasePublished = useCallback((_caseId: number) => {
+    setLearnerRefreshKey((n) => n + 1)
   }, [])
 
   const refreshSession = useCallback(async () => {
@@ -178,10 +183,16 @@ function App() {
             <EditorFacts
               onError={handleError}
               focusCaseId={editorCaseId}
+              onCasePublished={handleCasePublished}
             />
           </>
         ) : null}
-        {user ? <LearnerPanel onError={handleError} /> : null}
+        {user ? (
+          <LearnerPanel
+            onError={handleError}
+            refreshKey={learnerRefreshKey}
+          />
+        ) : null}
       </div>
     </main>
   )
