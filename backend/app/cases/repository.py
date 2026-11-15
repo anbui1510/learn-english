@@ -28,6 +28,8 @@ class CaseRecord:
     extract_error: str | None
     extract_started_at: str | None
     extract_finished_at: str | None
+    published_at: str | None
+    published_by_user_id: int | None
     created_at: str
     updated_at: str
 
@@ -60,6 +62,10 @@ def _row_to_case(row: sqlite3.Row) -> CaseRecord:
         ),
         extract_finished_at=(
             row["extract_finished_at"] if "extract_finished_at" in keys else None
+        ),
+        published_at=row["published_at"] if "published_at" in keys else None,
+        published_by_user_id=(
+            row["published_by_user_id"] if "published_by_user_id" in keys else None
         ),
         created_at=row["created_at"],
         updated_at=row["updated_at"],
@@ -180,6 +186,41 @@ class CaseRepository:
                 WHERE id = ?
                 """,
                 (status, error, started_at, finished_at, now, case_id),
+            )
+            conn.commit()
+            row = conn.execute(
+                "SELECT * FROM cases WHERE id = ?",
+                (case_id,),
+            ).fetchone()
+            assert row is not None
+            return _row_to_case(row)
+
+    def publish(
+        self,
+        *,
+        case_id: int,
+        publisher: UserRecord,
+    ) -> CaseRecord:
+        now = _now()
+        with self._conn() as conn:
+            existing = conn.execute(
+                "SELECT * FROM cases WHERE id = ?",
+                (case_id,),
+            ).fetchone()
+            if existing is None:
+                raise KeyError(f"case {case_id} not found")
+            if existing["status"] == "published":
+                return _row_to_case(existing)
+            conn.execute(
+                """
+                UPDATE cases
+                SET status = 'published',
+                    published_at = ?,
+                    published_by_user_id = ?,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (now, publisher.id, now, case_id),
             )
             conn.commit()
             row = conn.execute(

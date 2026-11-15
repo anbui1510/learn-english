@@ -14,6 +14,7 @@ from fastapi import (
     UploadFile,
     status,
 )
+from jsonschema.exceptions import ValidationError
 from pydantic import BaseModel, Field
 
 from app.auth.deps import get_current_user, require_editor
@@ -21,7 +22,7 @@ from app.auth.settings import get_auth_settings
 from app.cases.repository import CaseRecord
 from app.cases.service import get_case_repository
 from app.facts.extract import background_extract
-from app.facts.repository import FactRecord
+from app.facts.repository import FactRecord, FactStatus
 from app.facts.service import get_fact_repository
 from app.storage.factory import get_storage
 from app.users.repository import UserRecord
@@ -56,8 +57,17 @@ class CaseOut(BaseModel):
     extract_error: str | None = None
     extract_started_at: str | None = None
     extract_finished_at: str | None = None
+    published_at: str | None = None
+    published_by_user_id: int | None = None
     created_at: str
     updated_at: str
+
+
+class FactPatchIn(BaseModel):
+    status: FactStatus | None = None
+    source_quote: str | None = Field(default=None, min_length=1)
+    atomic_fact: str | None = Field(default=None, min_length=1)
+    category: str | None = Field(default=None, min_length=1)
 
 
 class DownloadUrlOut(BaseModel):
@@ -101,6 +111,8 @@ def _case_out(case: CaseRecord) -> CaseOut:
         extract_error=case.extract_error,
         extract_started_at=case.extract_started_at,
         extract_finished_at=case.extract_finished_at,
+        published_at=case.published_at,
+        published_by_user_id=case.published_by_user_id,
         created_at=case.created_at,
         updated_at=case.updated_at,
     )
@@ -268,10 +280,11 @@ def list_case_facts(
     if status_filter is not None and status_filter not in {
         "needs_review",
         "verified",
+        "rejected",
     }:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="status must be needs_review or verified",
+            detail="status must be needs_review, verified, or rejected",
         )
     facts = get_fact_repository().list_for_case(
         case_id,
@@ -279,6 +292,86 @@ def list_case_facts(
         category=category,
     )
     return [_fact_out(fact) for fact in facts]
+
+
+@router.patch("/cases/{case_id}/facts/{fact_id}", response_model=FactOut)
+def patch_case_fact(
+    case_id: int,
+    fact_id: int,
+    body: FactPatchIn,
+    user: Annotated[UserRecord, Depends(require_editor)],
+) -> FactOut:
+    _require_case_access(user, case_id)
+    if (
+        body.status is None
+        and body.source_quote is None
+        and body.atomic_fact is None
+        and body.category is None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one field is required",
+        )
+    facts = get_fact_repository()
+    existing = facts.get_by_id(fact_id)
+    if existing is None or existing.case_id != case_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fact not found")
+    try:
+        updated = facts.update_fact(
+            fact_id=fact_id,
+            actor_user_id=user.id,
+            status=body.status,
+            source_quote=body.source_quote,
+            atomic_fact=body.atomic_fact,
+            category=body.category,
+        )
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=exc.message,
+        ) from exc
+    return _fact_out(updated)
+
+
+@router.post("/cases/{case_id}/publish", response_model=CaseOut)
+def publish_case(
+    case_id: int,
+    user: Annotated[UserRecord, Depends(require_editor)],
+) -> CaseOut:
+    _require_case_access(user, case_id)
+    counts = get_fact_repository().count_by_status(case_id)
+    needs_review = counts.get("needs_review", 0)
+    verified = counts.get("verified", 0)
+    if needs_review > 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Cannot publish while {needs_review} fact(s) still need review",
+        )
+    if verified < 1:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot publish without at least one verified fact",
+        )
+    published = get_case_repository().publish(case_id=case_id, publisher=user)
+    return _case_out(published)
+
+
+@router.post("/cases/{case_id}/generate-dialogues")
+def generate_dialogues(
+    case_id: int,
+    user: Annotated[UserRecord, Depends(require_editor)],
+) -> dict[str, str]:
+    """Publish gate only — dialogue generation belongs to epic 5."""
+    case = _require_case_access(user, case_id)
+    if case.status != "published":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Case must be published before generate-dialogues",
+        )
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="Dialogue generation is reserved for epic 5",
+    )
 
 
 @router.get("/cases/{case_id}/download-url", response_model=DownloadUrlOut)

@@ -62,8 +62,8 @@
     },
     "status": {
       "type": "string",
-      "enum": ["needs_review", "verified"],
-      "description": "Editorial status; defaults to needs_review until verified."
+      "enum": ["needs_review", "verified", "rejected"],
+      "description": "Editorial status; defaults to needs_review until verified or rejected."
     }
   }
 }

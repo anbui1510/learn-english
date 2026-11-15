@@ -91,6 +91,8 @@ export type CaseDraft = {
   pdf_byte_size: number | null
   extract_status: ExtractStatus
   extract_error: string | null
+  published_at: string | null
+  published_by_user_id: number | null
 }
 
 export type ClinicalFact = {
@@ -99,7 +101,7 @@ export type ClinicalFact = {
   source_quote: string
   atomic_fact: string
   category: string
-  status: 'needs_review' | 'verified'
+  status: 'needs_review' | 'verified' | 'rejected'
   page: number
   section: string | null
   isbn: string
@@ -180,4 +182,57 @@ export async function listCaseFacts(
     throw new Error(`Failed to list facts (${response.status})`)
   }
   return (await response.json()) as ClinicalFact[]
+}
+
+export async function patchCaseFact(
+  caseId: number,
+  factId: number,
+  body: {
+    status?: ClinicalFact['status']
+    source_quote?: string
+    atomic_fact?: string
+    category?: string
+  },
+): Promise<ClinicalFact> {
+  const response = await fetch(
+    `${API_BASE}/editor/cases/${caseId}/facts/${factId}`,
+    {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  )
+  if (!response.ok) {
+    throw new Error(`Fact update failed (${response.status})`)
+  }
+  return (await response.json()) as ClinicalFact
+}
+
+export async function publishCase(caseId: number): Promise<CaseDraft> {
+  const response = await fetch(`${API_BASE}/editor/cases/${caseId}/publish`, {
+    method: 'POST',
+    credentials: 'include',
+  })
+  if (!response.ok) {
+    throw new Error(`Publish failed (${response.status})`)
+  }
+  return (await response.json()) as CaseDraft
+}
+
+export async function generateDialogues(
+  caseId: number,
+): Promise<{ ok: true } | { status: number; detail: string }> {
+  const response = await fetch(
+    `${API_BASE}/editor/cases/${caseId}/generate-dialogues`,
+    {
+      method: 'POST',
+      credentials: 'include',
+    },
+  )
+  if (response.ok) {
+    return { ok: true }
+  }
+  const detail = await response.text()
+  return { status: response.status, detail }
 }

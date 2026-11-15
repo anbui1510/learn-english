@@ -40,9 +40,12 @@ CREATE TABLE IF NOT EXISTS cases (
     extract_error TEXT,
     extract_started_at TEXT,
     extract_finished_at TEXT,
+    published_at TEXT,
+    published_by_user_id INTEGER,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
-    FOREIGN KEY(owner_user_id) REFERENCES users(id)
+    FOREIGN KEY(owner_user_id) REFERENCES users(id),
+    FOREIGN KEY(published_by_user_id) REFERENCES users(id)
 );
 
 CREATE TABLE IF NOT EXISTS facts (
@@ -51,7 +54,7 @@ CREATE TABLE IF NOT EXISTS facts (
     source_quote TEXT NOT NULL,
     atomic_fact TEXT NOT NULL,
     category TEXT NOT NULL,
-    status TEXT NOT NULL CHECK(status IN ('needs_review', 'verified')),
+    status TEXT NOT NULL CHECK(status IN ('needs_review', 'verified', 'rejected')),
     page INTEGER NOT NULL CHECK(page >= 1),
     chapter TEXT,
     section TEXT,
@@ -60,6 +63,17 @@ CREATE TABLE IF NOT EXISTS facts (
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     FOREIGN KEY(case_id) REFERENCES cases(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS fact_status_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fact_id INTEGER NOT NULL,
+    actor_user_id INTEGER,
+    old_status TEXT,
+    new_status TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(fact_id) REFERENCES facts(id) ON DELETE CASCADE,
+    FOREIGN KEY(actor_user_id) REFERENCES users(id)
 );
 """
 
@@ -71,6 +85,8 @@ _CASE_COLUMNS: dict[str, str] = {
     "extract_error": "TEXT",
     "extract_started_at": "TEXT",
     "extract_finished_at": "TEXT",
+    "published_at": "TEXT",
+    "published_by_user_id": "INTEGER",
 }
 
 
@@ -84,6 +100,49 @@ def connect(db_path: str | Path) -> sqlite3.Connection:
     return conn
 
 
+def _migrate_facts_status_rejected(conn: sqlite3.Connection) -> None:
+    """Rebuild facts table when CHECK constraint lacks rejected."""
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='facts'"
+    ).fetchone()
+    if row is None or not row[0]:
+        return
+    ddl = row[0]
+    if "rejected" in ddl:
+        return
+    conn.executescript(
+        """
+        CREATE TABLE facts_migrated (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            case_id INTEGER NOT NULL,
+            source_quote TEXT NOT NULL,
+            atomic_fact TEXT NOT NULL,
+            category TEXT NOT NULL,
+            status TEXT NOT NULL
+                CHECK(status IN ('needs_review', 'verified', 'rejected')),
+            page INTEGER NOT NULL CHECK(page >= 1),
+            chapter TEXT,
+            section TEXT,
+            isbn TEXT NOT NULL,
+            edition TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY(case_id) REFERENCES cases(id) ON DELETE CASCADE
+        );
+        INSERT INTO facts_migrated (
+            id, case_id, source_quote, atomic_fact, category, status,
+            page, chapter, section, isbn, edition, created_at, updated_at
+        )
+        SELECT
+            id, case_id, source_quote, atomic_fact, category, status,
+            page, chapter, section, isbn, edition, created_at, updated_at
+        FROM facts;
+        DROP TABLE facts;
+        ALTER TABLE facts_migrated RENAME TO facts;
+        """
+    )
+
+
 def init_db(conn: sqlite3.Connection) -> None:
     conn.executescript(_SCHEMA)
     existing = {
@@ -92,4 +151,5 @@ def init_db(conn: sqlite3.Connection) -> None:
     for name, col_type in _CASE_COLUMNS.items():
         if name not in existing:
             conn.execute(f"ALTER TABLE cases ADD COLUMN {name} {col_type}")
+    _migrate_facts_status_rejected(conn)
     conn.commit()

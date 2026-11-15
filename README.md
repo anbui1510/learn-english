@@ -69,6 +69,9 @@ Roles persist in SQLite (`DATABASE_PATH`, default `backend/data/learn_english.sq
 | `GET` | `/editor/cases/{id}` | Case detail including extract job status |
 | `POST` | `/editor/cases/{id}/extract` | Queue in-process fact extraction (owner/admin) |
 | `GET` | `/editor/cases/{id}/facts` | List facts; optional `status` / `category` filters |
+| `PATCH` | `/editor/cases/{id}/facts/{fact_id}` | Verify / reject / edit fact (+ status audit) |
+| `POST` | `/editor/cases/{id}/publish` | Publish when ≥1 verified and 0 `needs_review` |
+| `POST` | `/editor/cases/{id}/generate-dialogues` | `409` if draft; `501` stub until epic 5 |
 | `GET` | `/editor/cases/{id}/download-url` | Time-limited signed URL (owner/admin); learner `403` |
 | `GET` | `/editor/cases/{id}/pdf` | Session stream of PDF for owner/admin |
 | `GET` | `/storage/local` | Local adapter signed-URL download |
@@ -78,6 +81,8 @@ Roles persist in SQLite (`DATABASE_PATH`, default `backend/data/learn_english.sq
 **Storage:** local filesystem under `STORAGE_ROOT` by default. Set `GCS_BUCKET` (and install `google-cloud-storage`) to use GCS. `PDF_MAX_BYTES` defaults to 25 MB.
 
 **Fact extraction:** parser port defaults to pypdf + clinical heading heuristics (Docling optional when installed). Facts default to `needs_review` and validate against the clinical-fact schema before write.
+
+**Editorial workflow:** fact status may be `needs_review` | `verified` | `rejected` (audited). Publish sets `published_at` + `published_by_user_id`. `generate-dialogues` is a publish gate only until epic 5.
 
 ### Google OAuth setup (manual verify)
 

@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
+  generateDialogues,
   getCase,
   listCaseFacts,
   listMyCases,
+  patchCaseFact,
+  publishCase,
   startExtract,
   type CaseDraft,
   type ClinicalFact,
@@ -32,7 +35,7 @@ export function EditorFacts({ onError }: Props) {
   const [facts, setFacts] = useState<ClinicalFact[]>([])
   const [statusFilter, setStatusFilter] = useState('needs_review')
   const [busy, setBusy] = useState(false)
-  const [extractNote, setExtractNote] = useState<string | null>(null)
+  const [note, setNote] = useState<string | null>(null)
 
   const refreshCases = useCallback(async () => {
     const listed = await listMyCases()
@@ -102,15 +105,15 @@ export function EditorFacts({ onError }: Props) {
     if (selectedId == null) return
     setBusy(true)
     onError(null)
-    setExtractNote(null)
+    setNote(null)
     try {
       await startExtract(selectedId)
       const draft = await waitForExtract(selectedId)
       await refreshCases()
       if (draft.extract_status === 'failed') {
-        setExtractNote(draft.extract_error ?? 'Extraction failed')
+        setNote(draft.extract_error ?? 'Extraction failed')
       } else {
-        setExtractNote(`Extract ${draft.extract_status}`)
+        setNote(`Extract ${draft.extract_status}`)
         await refreshFacts(selectedId)
       }
     } catch (err) {
@@ -120,11 +123,70 @@ export function EditorFacts({ onError }: Props) {
     }
   }
 
+  async function onSetStatus(
+    fact: ClinicalFact,
+    status: ClinicalFact['status'],
+  ) {
+    if (selectedId == null) return
+    setBusy(true)
+    onError(null)
+    try {
+      await patchCaseFact(selectedId, fact.id, { status })
+      await refreshFacts(selectedId)
+      await refreshCases()
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Fact update failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onPublish() {
+    if (selectedId == null) return
+    setBusy(true)
+    onError(null)
+    setNote(null)
+    try {
+      const draft = await publishCase(selectedId)
+      setNote(`Case #${draft.id} published`)
+      await refreshCases()
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Publish failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onGenerate() {
+    if (selectedId == null) return
+    setBusy(true)
+    onError(null)
+    setNote(null)
+    try {
+      const result = await generateDialogues(selectedId)
+      if ('ok' in result) {
+        setNote('Dialogues generated')
+      } else if (result.status === 409) {
+        setNote('Publish the case before generate-dialogues (409).')
+      } else if (result.status === 501) {
+        setNote('Dialogue generation reserved for epic 5 (501).')
+      } else {
+        onError(`generate-dialogues failed (${result.status})`)
+      }
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'generate-dialogues failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <section className="mt-8 border-t border-slate-200 pt-8">
-      <h2 className="text-xl font-semibold tracking-tight">Extract facts</h2>
+      <h2 className="text-xl font-semibold tracking-tight">
+        Extract & review facts
+      </h2>
       <p className="mt-1 text-sm text-slate-600">
-        Run extraction on an uploaded case, then browse quote-backed fact cards.
+        Extract, verify or reject fact cards, then publish the case.
       </p>
 
       {cases.length === 0 ? (
@@ -142,7 +204,7 @@ export function EditorFacts({ onError }: Props) {
             >
               {cases.map((c) => (
                 <option key={c.id} value={c.id}>
-                  #{c.id} — {c.title} ({c.extract_status})
+                  #{c.id} — {c.title} ({c.status}/{c.extract_status})
                 </option>
               ))}
             </select>
@@ -150,23 +212,42 @@ export function EditorFacts({ onError }: Props) {
 
           {selected ? (
             <p className="text-sm text-slate-500">
-              Status: {selected.extract_status}
+              Extract: {selected.extract_status}
               {selected.extract_error ? ` — ${selected.extract_error}` : ''}
+              {selected.status === 'published' && selected.published_at
+                ? ` · published ${selected.published_at}`
+                : ''}
             </p>
           ) : null}
 
-          <button
-            type="button"
-            disabled={busy || selectedId == null || !selected?.pdf_object_key}
-            onClick={() => void onExtract()}
-            className="w-fit rounded-md bg-teal-700 px-3 py-2 text-sm font-medium text-white hover:bg-teal-600 disabled:opacity-60"
-          >
-            {busy ? 'Extracting…' : 'Start extract'}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={busy || selectedId == null || !selected?.pdf_object_key}
+              onClick={() => void onExtract()}
+              className="rounded-md bg-teal-700 px-3 py-2 text-sm font-medium text-white hover:bg-teal-600 disabled:opacity-60"
+            >
+              {busy ? 'Working…' : 'Start extract'}
+            </button>
+            <button
+              type="button"
+              disabled={busy || selectedId == null || selected?.status === 'published'}
+              onClick={() => void onPublish()}
+              className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+            >
+              Publish case
+            </button>
+            <button
+              type="button"
+              disabled={busy || selectedId == null}
+              onClick={() => void onGenerate()}
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100 disabled:opacity-60"
+            >
+              Generate dialogues
+            </button>
+          </div>
 
-          {extractNote ? (
-            <p className="text-sm text-slate-600">{extractNote}</p>
-          ) : null}
+          {note ? <p className="text-sm text-slate-600">{note}</p> : null}
 
           <label className="text-sm">
             Filter status
@@ -177,6 +258,7 @@ export function EditorFacts({ onError }: Props) {
             >
               <option value="needs_review">needs_review</option>
               <option value="verified">verified</option>
+              <option value="rejected">rejected</option>
               <option value="">all</option>
             </select>
           </label>
@@ -194,6 +276,24 @@ export function EditorFacts({ onError }: Props) {
                 <p className="mt-1 text-xs text-slate-500">
                   {fact.category} · p.{fact.page} · {fact.status}
                 </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={busy || fact.status === 'verified'}
+                    onClick={() => void onSetStatus(fact, 'verified')}
+                    className="text-xs font-medium text-teal-800 underline disabled:opacity-40"
+                  >
+                    Verify
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy || fact.status === 'rejected'}
+                    onClick={() => void onSetStatus(fact, 'rejected')}
+                    className="text-xs font-medium text-slate-700 underline disabled:opacity-40"
+                  >
+                    Reject
+                  </button>
+                </div>
               </li>
             ))}
             {facts.length === 0 ? (
