@@ -9,6 +9,7 @@ from app.admin.router import router as admin_router
 from app.auth.router import router as auth_router
 from app.auth.settings import AuthSettings, get_auth_settings
 from app.cases.service import get_case_repository
+from app.dialogues.service import get_dialogue_repository
 from app.editor.router import router as editor_router
 from app.facts.service import get_fact_repository
 from app.storage.router import router as storage_router
@@ -23,6 +24,7 @@ def create_app(settings: AuthSettings | None = None) -> FastAPI:
         get_user_repository()
         get_case_repository()
         get_fact_repository()
+        get_dialogue_repository()
         yield
 
     application = FastAPI(

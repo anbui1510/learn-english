@@ -2,18 +2,28 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   generateDialogues,
   getCase,
+  listCaseDialogues,
   listCaseFacts,
   listMyCases,
   patchCaseFact,
   publishCase,
   startExtract,
   type CaseDraft,
+  type CefrLevel,
   type ClinicalFact,
+  type DialogueArtifact,
+  type DialogueContext,
 } from './api'
 
 type Props = {
   onError: (message: string | null) => void
 }
+
+const ALL_CONTEXTS: DialogueContext[] = [
+  'patient_family',
+  'colleague_sbar',
+  'expert_cme',
+]
 
 async function waitForExtract(caseId: number): Promise<CaseDraft> {
   for (let attempt = 0; attempt < 40; attempt += 1) {
@@ -33,7 +43,13 @@ export function EditorFacts({ onError }: Props) {
   const [cases, setCases] = useState<CaseDraft[]>([])
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [facts, setFacts] = useState<ClinicalFact[]>([])
+  const [dialogues, setDialogues] = useState<DialogueArtifact[]>([])
   const [statusFilter, setStatusFilter] = useState('needs_review')
+  const [contexts, setContexts] = useState<DialogueContext[]>([
+    'patient_family',
+  ])
+  const [cefrLevel, setCefrLevel] = useState<CefrLevel>('B1')
+  const [includeVi, setIncludeVi] = useState(false)
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<string | null>(null)
 
@@ -54,6 +70,11 @@ export function EditorFacts({ onError }: Props) {
     },
     [statusFilter],
   )
+
+  const refreshDialogues = useCallback(async (caseId: number) => {
+    const listed = await listCaseDialogues(caseId)
+    setDialogues(listed)
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -79,18 +100,23 @@ export function EditorFacts({ onError }: Props) {
   useEffect(() => {
     if (selectedId == null) {
       setFacts([])
+      setDialogues([])
       return
     }
     let cancelled = false
     ;(async () => {
       try {
-        const listed = await listCaseFacts(selectedId, {
-          status: statusFilter || undefined,
-        })
-        if (!cancelled) setFacts(listed)
+        const [factList, dialogueList] = await Promise.all([
+          listCaseFacts(selectedId, { status: statusFilter || undefined }),
+          listCaseDialogues(selectedId),
+        ])
+        if (!cancelled) {
+          setFacts(factList)
+          setDialogues(dialogueList)
+        }
       } catch (err) {
         if (!cancelled) {
-          onError(err instanceof Error ? err.message : 'Failed to load facts')
+          onError(err instanceof Error ? err.message : 'Failed to load case data')
         }
       }
     })()
@@ -100,6 +126,14 @@ export function EditorFacts({ onError }: Props) {
   }, [selectedId, statusFilter, onError])
 
   const selected = cases.find((c) => c.id === selectedId) ?? null
+
+  function toggleContext(context: DialogueContext) {
+    setContexts((prev) =>
+      prev.includes(context)
+        ? prev.filter((c) => c !== context)
+        : [...prev, context],
+    )
+  }
 
   async function onExtract() {
     if (selectedId == null) return
@@ -158,21 +192,23 @@ export function EditorFacts({ onError }: Props) {
   }
 
   async function onGenerate() {
-    if (selectedId == null) return
+    if (selectedId == null || contexts.length === 0) return
     setBusy(true)
     onError(null)
     setNote(null)
     try {
-      const result = await generateDialogues(selectedId)
-      if ('ok' in result) {
-        setNote('Dialogues generated')
-      } else if (result.status === 409) {
-        setNote('Publish the case before generate-dialogues (409).')
-      } else if (result.status === 501) {
-        setNote('Dialogue generation reserved for epic 5 (501).')
-      } else {
-        onError(`generate-dialogues failed (${result.status})`)
-      }
+      const created = await generateDialogues(selectedId, {
+        contexts,
+        cefr_level: cefrLevel,
+        include_vi: includeVi,
+      })
+      const warned = created.filter((d) => d.duration_warning).length
+      setNote(
+        warned > 0
+          ? `Generated ${created.length} dialogue(s); ${warned} exceed ~2 min.`
+          : `Generated ${created.length} dialogue(s).`,
+      )
+      await refreshDialogues(selectedId)
     } catch (err) {
       onError(err instanceof Error ? err.message : 'generate-dialogues failed')
     } finally {
@@ -183,10 +219,10 @@ export function EditorFacts({ onError }: Props) {
   return (
     <section className="mt-8 border-t border-slate-200 pt-8">
       <h2 className="text-xl font-semibold tracking-tight">
-        Extract & review facts
+        Extract, review & dialogues
       </h2>
       <p className="mt-1 text-sm text-slate-600">
-        Extract, verify or reject fact cards, then publish the case.
+        Extract facts, verify them, publish the case, then generate CEFR dialogues.
       </p>
 
       {cases.length === 0 ? (
@@ -237,15 +273,58 @@ export function EditorFacts({ onError }: Props) {
             >
               Publish case
             </button>
-            <button
-              type="button"
-              disabled={busy || selectedId == null}
-              onClick={() => void onGenerate()}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100 disabled:opacity-60"
-            >
-              Generate dialogues
-            </button>
           </div>
+
+          <fieldset className="mt-2 border-t border-slate-200 pt-3">
+            <legend className="text-sm font-medium text-slate-800">
+              Generate dialogues
+            </legend>
+            <div className="mt-2 flex flex-col gap-2 text-sm">
+              {ALL_CONTEXTS.map((context) => (
+                <label key={context} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={contexts.includes(context)}
+                    onChange={() => toggleContext(context)}
+                  />
+                  {context}
+                </label>
+              ))}
+              <label>
+                CEFR
+                <select
+                  className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+                  value={cefrLevel}
+                  onChange={(e) => setCefrLevel(e.target.value as CefrLevel)}
+                >
+                  <option value="A2">A2</option>
+                  <option value="B1">B1</option>
+                  <option value="C1">C1</option>
+                </select>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={includeVi}
+                  onChange={(e) => setIncludeVi(e.target.checked)}
+                />
+                Include Vietnamese gloss
+              </label>
+              <button
+                type="button"
+                disabled={
+                  busy ||
+                  selectedId == null ||
+                  selected?.status !== 'published' ||
+                  contexts.length === 0
+                }
+                onClick={() => void onGenerate()}
+                className="w-fit rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100 disabled:opacity-60"
+              >
+                Generate dialogues
+              </button>
+            </div>
+          </fieldset>
 
           {note ? <p className="text-sm text-slate-600">{note}</p> : null}
 
@@ -300,6 +379,36 @@ export function EditorFacts({ onError }: Props) {
               <li className="text-sm text-slate-500">No facts for this filter.</li>
             ) : null}
           </ul>
+
+          <div className="mt-4 border-t border-slate-200 pt-4">
+            <h3 className="text-base font-semibold">Dialogues</h3>
+            <ul className="mt-2 flex flex-col gap-4">
+              {dialogues.map((dialogue) => (
+                <li key={dialogue.id} className="text-sm text-slate-800">
+                  <p className="font-medium">
+                    #{dialogue.id} · {dialogue.context} · {dialogue.cefr_level} ·{' '}
+                    ~{dialogue.estimated_seconds}s
+                    {dialogue.duration_warning ? ' · over 2 min' : ''}
+                  </p>
+                  <ol className="mt-2 list-decimal space-y-1 pl-5 text-slate-700">
+                    {dialogue.lines.map((line, index) => (
+                      <li key={`${dialogue.id}-${index}`}>
+                        <span className="font-medium">{line.speaker}:</span>{' '}
+                        {line.text}
+                        <span className="block text-xs text-slate-500">
+                          facts: {line.fact_ids.join(', ')}
+                          {line.text_vi ? ` · ${line.text_vi}` : ''}
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                </li>
+              ))}
+              {dialogues.length === 0 ? (
+                <li className="text-sm text-slate-500">No dialogues yet.</li>
+              ) : null}
+            </ul>
+          </div>
         </div>
       )}
     </section>

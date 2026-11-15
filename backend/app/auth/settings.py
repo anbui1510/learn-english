@@ -37,6 +37,7 @@ class AuthSettings:
     api_public_base_url: str
     pdf_max_bytes: int
     signed_url_ttl_seconds: int
+    gemini_api_key: str
 
     @property
     def oauth_configured(self) -> bool:
@@ -85,6 +86,7 @@ def get_auth_settings() -> AuthSettings:
         api_public_base_url=_env("API_PUBLIC_BASE_URL", "http://127.0.0.1:8000"),
         pdf_max_bytes=int(_env("PDF_MAX_BYTES", str(25 * 1024 * 1024))),
         signed_url_ttl_seconds=int(_env("SIGNED_URL_TTL_SECONDS", "300")),
+        gemini_api_key=_env("GEMINI_API_KEY"),
     )
 
 

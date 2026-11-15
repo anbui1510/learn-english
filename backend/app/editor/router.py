@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import (
     APIRouter,
@@ -21,6 +21,11 @@ from app.auth.deps import get_current_user, require_editor
 from app.auth.settings import get_auth_settings
 from app.cases.repository import CaseRecord
 from app.cases.service import get_case_repository
+from app.dialogues.generate import GenerateError, generate_for_case
+from app.dialogues.generator import CONTEXTS, CefrLevel, DialogueContext
+from app.dialogues.generator import get_default_generator
+from app.dialogues.repository import DialogueRecord
+from app.dialogues.service import get_dialogue_repository
 from app.facts.extract import background_extract
 from app.facts.repository import FactRecord, FactStatus
 from app.facts.service import get_fact_repository
@@ -68,6 +73,23 @@ class FactPatchIn(BaseModel):
     source_quote: str | None = Field(default=None, min_length=1)
     atomic_fact: str | None = Field(default=None, min_length=1)
     category: str | None = Field(default=None, min_length=1)
+
+
+class GenerateDialoguesIn(BaseModel):
+    contexts: list[DialogueContext] = Field(min_length=1, max_length=3)
+    cefr_level: CefrLevel = "B1"
+    include_vi: bool = False
+
+
+class DialogueOut(BaseModel):
+    id: int
+    case_id: int
+    context: str
+    cefr_level: str
+    estimated_seconds: float
+    duration_warning: bool
+    lines: list[dict[str, Any]]
+    created_at: str
 
 
 class DownloadUrlOut(BaseModel):
@@ -133,6 +155,19 @@ def _fact_out(fact: FactRecord) -> FactOut:
         edition=fact.edition,
         created_at=fact.created_at,
         updated_at=fact.updated_at,
+    )
+
+
+def _dialogue_out(record: DialogueRecord) -> DialogueOut:
+    return DialogueOut(
+        id=record.id,
+        case_id=record.case_id,
+        context=record.context,
+        cefr_level=record.cefr_level,
+        estimated_seconds=record.estimated_seconds,
+        duration_warning=record.duration_warning,
+        lines=list(record.payload.get("lines") or []),
+        created_at=record.created_at,
     )
 
 
@@ -356,22 +391,67 @@ def publish_case(
     return _case_out(published)
 
 
-@router.post("/cases/{case_id}/generate-dialogues")
+@router.post(
+    "/cases/{case_id}/generate-dialogues",
+    response_model=list[DialogueOut],
+)
 def generate_dialogues(
     case_id: int,
+    body: GenerateDialoguesIn,
     user: Annotated[UserRecord, Depends(require_editor)],
-) -> dict[str, str]:
-    """Publish gate only — dialogue generation belongs to epic 5."""
+) -> list[DialogueOut]:
     case = _require_case_access(user, case_id)
     if case.status != "published":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Case must be published before generate-dialogues",
         )
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Dialogue generation is reserved for epic 5",
-    )
+    # Deduplicate while preserving order
+    seen: set[str] = set()
+    contexts: list[DialogueContext] = []
+    for ctx in body.contexts:
+        if ctx in CONTEXTS and ctx not in seen:
+            seen.add(ctx)
+            contexts.append(ctx)
+    if not contexts:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Select at least one valid context",
+        )
+    settings = get_auth_settings()
+    try:
+        created = generate_for_case(
+            case=case,
+            contexts=contexts,
+            cefr_level=body.cefr_level,
+            include_vi=body.include_vi,
+            facts=get_fact_repository(),
+            dialogues=get_dialogue_repository(),
+            generator=get_default_generator(settings.gemini_api_key),
+        )
+    except GenerateError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=exc.message,
+        ) from exc
+    return [_dialogue_out(item) for item in created]
+
+
+@router.get("/cases/{case_id}/dialogues", response_model=list[DialogueOut])
+def list_case_dialogues(
+    case_id: int,
+    user: Annotated[UserRecord, Depends(require_editor)],
+) -> list[DialogueOut]:
+    _require_case_access(user, case_id)
+    return [
+        _dialogue_out(item)
+        for item in get_dialogue_repository().list_for_case(case_id)
+    ]
 
 
 @router.get("/cases/{case_id}/download-url", response_model=DownloadUrlOut)

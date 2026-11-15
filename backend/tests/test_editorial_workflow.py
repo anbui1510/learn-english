@@ -107,7 +107,10 @@ def test_publish_gate_and_generate_dialogues(
     blocked = client.post(f"/editor/cases/{case_id}/publish")
     assert blocked.status_code == 409
 
-    gen_draft = client.post(f"/editor/cases/{case_id}/generate-dialogues")
+    gen_draft = client.post(
+        f"/editor/cases/{case_id}/generate-dialogues",
+        json={"contexts": ["patient_family"], "cefr_level": "A2"},
+    )
     assert gen_draft.status_code == 409
 
     # Verify all facts; reject none — publish needs ≥1 verified and 0 needs_review
@@ -125,14 +128,21 @@ def test_publish_gate_and_generate_dialogues(
     assert body["published_at"]
     assert body["published_by_user_id"]
 
-    gen_published = client.post(f"/editor/cases/{case_id}/generate-dialogues")
-    assert gen_published.status_code == 501
+    gen_published = client.post(
+        f"/editor/cases/{case_id}/generate-dialogues",
+        json={"contexts": ["patient_family"], "cefr_level": "A2"},
+    )
+    assert gen_published.status_code == 200, gen_published.text
+    assert len(gen_published.json()) == 1
 
     _, learner = _editor_and_learner(auth_settings)
     set_session_cookie(client, auth_settings, learner)
     assert client.post(f"/editor/cases/{case_id}/publish").status_code == 403
     assert (
-        client.post(f"/editor/cases/{case_id}/generate-dialogues").status_code
+        client.post(
+            f"/editor/cases/{case_id}/generate-dialogues",
+            json={"contexts": ["patient_family"], "cefr_level": "A2"},
+        ).status_code
         == 403
     )
 

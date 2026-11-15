@@ -71,7 +71,8 @@ Roles persist in SQLite (`DATABASE_PATH`, default `backend/data/learn_english.sq
 | `GET` | `/editor/cases/{id}/facts` | List facts; optional `status` / `category` filters |
 | `PATCH` | `/editor/cases/{id}/facts/{fact_id}` | Verify / reject / edit fact (+ status audit) |
 | `POST` | `/editor/cases/{id}/publish` | Publish when ≥1 verified and 0 `needs_review` |
-| `POST` | `/editor/cases/{id}/generate-dialogues` | `409` if draft; `501` stub until epic 5 |
+| `POST` | `/editor/cases/{id}/generate-dialogues` | Generate 1–3 CEFR dialogues from verified facts (`409` if draft) |
+| `GET` | `/editor/cases/{id}/dialogues` | List generated dialogues for a Case |
 | `GET` | `/editor/cases/{id}/download-url` | Time-limited signed URL (owner/admin); learner `403` |
 | `GET` | `/editor/cases/{id}/pdf` | Session stream of PDF for owner/admin |
 | `GET` | `/storage/local` | Local adapter signed-URL download |
@@ -82,7 +83,9 @@ Roles persist in SQLite (`DATABASE_PATH`, default `backend/data/learn_english.sq
 
 **Fact extraction:** parser port defaults to pypdf + clinical heading heuristics (Docling optional when installed). Facts default to `needs_review` and validate against the clinical-fact schema before write.
 
-**Editorial workflow:** fact status may be `needs_review` | `verified` | `rejected` (audited). Publish sets `published_at` + `published_by_user_id`. `generate-dialogues` is a publish gate only until epic 5.
+**Editorial workflow:** fact status may be `needs_review` | `verified` | `rejected` (audited). Publish sets `published_at` + `published_by_user_id`.
+
+**Dialogue generation:** generator port defaults to a template builder from verified facts (set `GEMINI_API_KEY` for the Gemini adapter path). Contexts: `patient_family`, `colleague_sbar`, `expert_cme`. Each line cites `fact_ids`; optional `text_vi`; warns when estimated duration exceeds ~150s.
 
 ### Google OAuth setup (manual verify)
 

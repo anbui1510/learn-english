@@ -220,19 +220,64 @@ export async function publishCase(caseId: number): Promise<CaseDraft> {
   return (await response.json()) as CaseDraft
 }
 
+export type DialogueContext =
+  | 'patient_family'
+  | 'colleague_sbar'
+  | 'expert_cme'
+
+export type CefrLevel = 'A2' | 'B1' | 'C1'
+
+export type DialogueLine = {
+  speaker: string
+  text: string
+  text_vi?: string
+  fact_ids: string[]
+  is_key_phrase?: boolean
+}
+
+export type DialogueArtifact = {
+  id: number
+  case_id: number
+  context: DialogueContext
+  cefr_level: CefrLevel
+  estimated_seconds: number
+  duration_warning: boolean
+  lines: DialogueLine[]
+  created_at: string
+}
+
 export async function generateDialogues(
   caseId: number,
-): Promise<{ ok: true } | { status: number; detail: string }> {
+  input: {
+    contexts: DialogueContext[]
+    cefr_level: CefrLevel
+    include_vi?: boolean
+  },
+): Promise<DialogueArtifact[]> {
   const response = await fetch(
     `${API_BASE}/editor/cases/${caseId}/generate-dialogues`,
     {
       method: 'POST',
       credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
     },
   )
-  if (response.ok) {
-    return { ok: true }
+  if (!response.ok) {
+    throw new Error(`generate-dialogues failed (${response.status})`)
   }
-  const detail = await response.text()
-  return { status: response.status, detail }
+  return (await response.json()) as DialogueArtifact[]
+}
+
+export async function listCaseDialogues(
+  caseId: number,
+): Promise<DialogueArtifact[]> {
+  const response = await fetch(
+    `${API_BASE}/editor/cases/${caseId}/dialogues`,
+    { credentials: 'include' },
+  )
+  if (!response.ok) {
+    throw new Error(`Failed to list dialogues (${response.status})`)
+  }
+  return (await response.json()) as DialogueArtifact[]
 }

@@ -7,6 +7,7 @@ from app.auth.jwt_tokens import create_session_token
 from app.auth.oauth import reset_oauth_registration
 from app.auth.settings import AuthSettings, clear_auth_settings_cache, get_auth_settings
 from app.cases.service import clear_case_repository_cache
+from app.dialogues.service import clear_dialogue_repository_cache
 from app.facts.service import clear_fact_repository_cache
 from app.main import create_app
 from app.storage.factory import clear_storage_cache
@@ -20,6 +21,7 @@ def _clear_all_caches() -> None:
     clear_user_repository_cache()
     clear_case_repository_cache()
     clear_fact_repository_cache()
+    clear_dialogue_repository_cache()
     clear_storage_cache()
     reset_oauth_registration()
 

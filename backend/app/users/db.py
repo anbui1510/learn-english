@@ -75,6 +75,20 @@ CREATE TABLE IF NOT EXISTS fact_status_audit (
     FOREIGN KEY(fact_id) REFERENCES facts(id) ON DELETE CASCADE,
     FOREIGN KEY(actor_user_id) REFERENCES users(id)
 );
+
+CREATE TABLE IF NOT EXISTS dialogues (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id INTEGER NOT NULL,
+    context TEXT NOT NULL
+        CHECK(context IN ('patient_family', 'colleague_sbar', 'expert_cme')),
+    cefr_level TEXT NOT NULL CHECK(cefr_level IN ('A2', 'B1', 'C1')),
+    payload_json TEXT NOT NULL,
+    estimated_seconds REAL NOT NULL,
+    duration_warning INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY(case_id) REFERENCES cases(id) ON DELETE CASCADE
+);
 """
 
 _CASE_COLUMNS: dict[str, str] = {
