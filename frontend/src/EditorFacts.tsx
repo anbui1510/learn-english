@@ -8,6 +8,7 @@ import {
   patchCaseFact,
   publishCase,
   startExtract,
+  synthesizeDialogue,
   type CaseDraft,
   type CefrLevel,
   type ClinicalFact,
@@ -202,11 +203,14 @@ export function EditorFacts({ onError }: Props) {
         cefr_level: cefrLevel,
         include_vi: includeVi,
       })
+      for (const dialogue of created) {
+        await synthesizeDialogue(selectedId, dialogue.id)
+      }
       const warned = created.filter((d) => d.duration_warning).length
       setNote(
         warned > 0
-          ? `Generated ${created.length} dialogue(s); ${warned} exceed ~2 min.`
-          : `Generated ${created.length} dialogue(s).`,
+          ? `Generated + synthesized ${created.length} dialogue(s); ${warned} exceed ~2 min.`
+          : `Generated + synthesized ${created.length} dialogue(s).`,
       )
       await refreshDialogues(selectedId)
     } catch (err) {

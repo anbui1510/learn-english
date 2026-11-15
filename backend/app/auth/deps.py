@@ -53,3 +53,15 @@ def require_editor(
             detail="Editor role required",
         )
     return user
+
+
+def require_learner_access(
+    user: Annotated[UserRecord, Depends(get_current_user)],
+) -> UserRecord:
+    """Learner practice routes: learner, editor, or admin."""
+    if user.role not in {"learner", "editor", "admin"}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Authenticated learner access required",
+        )
+    return user

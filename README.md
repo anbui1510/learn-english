@@ -87,6 +87,21 @@ Roles persist in SQLite (`DATABASE_PATH`, default `backend/data/learn_english.sq
 
 **Dialogue generation:** generator port defaults to a template builder from verified facts (set `GEMINI_API_KEY` for the Gemini adapter path). Contexts: `patient_family`, `colleague_sbar`, `expert_cme`. Each line cites `fact_ids`; optional `text_vi`; warns when estimated duration exceeds ~150s.
 
+### Learner practice (epics 6–10)
+
+| Method | Path | Behavior |
+|--------|------|----------|
+| `POST` | `/editor/cases/{id}/dialogues/{dialogue_id}/synthesize` | TTS utterances + word timestamps (synthetic CI default) |
+| `GET` | `/learner/cases` | Published case library |
+| `GET` | `/learner/cases/{id}/dialogues` | Dialogues for a published case |
+| `GET` | `/learner/dialogues/{id}/lesson` | Karaoke playlist + citation metadata |
+| `GET` | `/learner/dialogues/{id}/shadowing` | Exactly 10 shadowing cards |
+| `GET`/`PATCH` | `/learner/profile` | 6-month path + lessons/week + CEFR package |
+| `POST` | `/learner/completions` | Mark karaoke+shadowing complete |
+| `POST` | `/learner/attempts/audio` | Upload LearningAttempt audio (Pha 2 ready) |
+
+TTS uses Guy/Jenny voice metadata with a silent-WAV synthetic engine for CI; optional `edge-tts` adapter path reserved.
+
 ### Google OAuth setup (manual verify)
 
 1. Create an OAuth 2.0 **Web application** client in Google Cloud Console.

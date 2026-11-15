@@ -9,7 +9,9 @@ from app.auth.settings import AuthSettings, clear_auth_settings_cache, get_auth_
 from app.cases.service import clear_case_repository_cache
 from app.dialogues.service import clear_dialogue_repository_cache
 from app.facts.service import clear_fact_repository_cache
+from app.learner.service import clear_learner_caches
 from app.main import create_app
+from app.speech.service import clear_utterance_repository_cache
 from app.storage.factory import clear_storage_cache
 from app.users.repository import UserRecord
 from app.users.roles import Role
@@ -22,6 +24,8 @@ def _clear_all_caches() -> None:
     clear_case_repository_cache()
     clear_fact_repository_cache()
     clear_dialogue_repository_cache()
+    clear_utterance_repository_cache()
+    clear_learner_caches()
     clear_storage_cache()
     reset_oauth_registration()
 

@@ -29,6 +29,8 @@ from app.dialogues.service import get_dialogue_repository
 from app.facts.extract import background_extract
 from app.facts.repository import FactRecord, FactStatus
 from app.facts.service import get_fact_repository
+from app.speech.service import get_utterance_repository
+from app.speech.synthesize import synthesize_dialogue
 from app.storage.factory import get_storage
 from app.users.repository import UserRecord
 
@@ -451,6 +453,57 @@ def list_case_dialogues(
     return [
         _dialogue_out(item)
         for item in get_dialogue_repository().list_for_case(case_id)
+    ]
+
+
+class UtteranceOut(BaseModel):
+    id: int
+    dialogue_id: int
+    line_index: int
+    speaker: str
+    voice: str
+    object_key: str
+    duration_ms: int
+    timestamps: list[dict[str, Any]]
+
+
+@router.post(
+    "/cases/{case_id}/dialogues/{dialogue_id}/synthesize",
+    response_model=list[UtteranceOut],
+)
+def synthesize_case_dialogue(
+    case_id: int,
+    dialogue_id: int,
+    user: Annotated[UserRecord, Depends(require_editor)],
+) -> list[UtteranceOut]:
+    _require_case_access(user, case_id)
+    dialogue = get_dialogue_repository().get_by_id(dialogue_id)
+    if dialogue is None or dialogue.case_id != case_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Dialogue not found"
+        )
+    try:
+        created = synthesize_dialogue(
+            dialogue=dialogue,
+            utterances=get_utterance_repository(),
+            storage=get_storage(),
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
+    return [
+        UtteranceOut(
+            id=item.id,
+            dialogue_id=item.dialogue_id,
+            line_index=item.line_index,
+            speaker=item.speaker,
+            voice=item.voice,
+            object_key=item.object_key,
+            duration_ms=item.duration_ms,
+            timestamps=item.timestamps,
+        )
+        for item in created
     ]
 
 

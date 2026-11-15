@@ -1,0 +1,419 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  completeLesson,
+  fetchLearnerProfile,
+  fetchLesson,
+  fetchShadowing,
+  listLearnerCaseDialogues,
+  listPublishedCases,
+  patchLearnerProfile,
+  uploadAttemptAudio,
+  type CefrLevel,
+  type Lesson,
+  type PublishedCase,
+  type ShadowingCard,
+} from './api'
+
+type Props = {
+  onError: (message: string | null) => void
+}
+
+type CaseDialogue = {
+  id: number
+  context: string
+  cefr_level: string
+}
+
+export function LearnerPanel({ onError }: Props) {
+  const [cases, setCases] = useState<PublishedCase[]>([])
+  const [caseId, setCaseId] = useState<number | null>(null)
+  const [dialogueId, setDialogueId] = useState<number | null>(null)
+  const [dialogues, setDialogues] = useState<CaseDialogue[]>([])
+  const [lesson, setLesson] = useState<Lesson | null>(null)
+  const [cards, setCards] = useState<ShadowingCard[]>([])
+  const [lineIndex, setLineIndex] = useState(0)
+  const [speed, setSpeed] = useState(1)
+  const [showVi, setShowVi] = useState(false)
+  const [activeWord, setActiveWord] = useState(-1)
+  const [lessonsPerWeek, setLessonsPerWeek] = useState(3)
+  const [cefrPackage, setCefrPackage] = useState<CefrLevel>('B1')
+  const [note, setNote] = useState<string | null>(null)
+  const [cardIndex, setCardIndex] = useState(0)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  const current = lesson?.playlist[lineIndex] ?? null
+  const speakerColor = useMemo(() => {
+    if (!current) return 'text-teal-800'
+    return current.speaker.toLowerCase().includes('parent') ||
+      current.speaker.toLowerCase().includes('nurse')
+      ? 'text-orange-700'
+      : 'text-teal-800'
+  }, [current])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const [listed, profile] = await Promise.all([
+          listPublishedCases(),
+          fetchLearnerProfile(),
+        ])
+        if (cancelled) return
+        setCases(listed)
+        setLessonsPerWeek(profile.lessons_per_week)
+        setCefrPackage(profile.cefr_package)
+        if (listed.length > 0) setCaseId(listed[0].id)
+      } catch (err) {
+        if (!cancelled) {
+          onError(
+            err instanceof Error ? err.message : 'Failed to load learner data',
+          )
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [onError])
+
+  useEffect(() => {
+    if (caseId == null) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const listed = await listLearnerCaseDialogues(caseId)
+        if (cancelled) return
+        setDialogues(listed)
+        setDialogueId(listed[0]?.id ?? null)
+      } catch (err) {
+        if (!cancelled) {
+          onError(
+            err instanceof Error ? err.message : 'Failed to list dialogues',
+          )
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [caseId, onError])
+
+  useEffect(() => {
+    if (dialogueId == null) {
+      setLesson(null)
+      setCards([])
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const [lessonBody, shadowCards] = await Promise.all([
+          fetchLesson(dialogueId),
+          fetchShadowing(dialogueId),
+        ])
+        if (cancelled) return
+        setLesson(lessonBody)
+        setCards(shadowCards)
+        setLineIndex(0)
+        setCardIndex(0)
+        setActiveWord(-1)
+      } catch (err) {
+        if (!cancelled) {
+          onError(err instanceof Error ? err.message : 'Failed to load lesson')
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [dialogueId, onError])
+
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio || !current) return
+    audio.pause()
+    audio.src = current.audio_url
+    audio.playbackRate = speed
+    setActiveWord(-1)
+  }, [current, speed])
+
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio || !current) return
+    const onTime = () => {
+      const ms = audio.currentTime * 1000 * speed
+      // playbackRate already stretches time; use currentTime*1000 for media position
+      const mediaMs = audio.currentTime * 1000
+      const idx = current.timestamps.findIndex(
+        (stamp) =>
+          mediaMs >= stamp.offset_ms &&
+          mediaMs < stamp.offset_ms + stamp.duration_ms,
+      )
+      setActiveWord(idx)
+      void ms
+    }
+    audio.addEventListener('timeupdate', onTime)
+    return () => audio.removeEventListener('timeupdate', onTime)
+  }, [current, speed])
+
+  async function onSaveProfile() {
+    onError(null)
+    try {
+      const profile = await patchLearnerProfile({
+        lessons_per_week: lessonsPerWeek,
+        cefr_package: cefrPackage,
+      })
+      setNote(
+        `Saved journey: ${profile.lessons_per_week}/week · ${profile.cefr_package} · ${profile.path_months} months`,
+      )
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Failed to save profile')
+    }
+  }
+
+  async function onComplete() {
+    if (dialogueId == null) return
+    onError(null)
+    try {
+      await completeLesson(dialogueId)
+      setNote('Lesson marked complete')
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Failed to complete')
+    }
+  }
+
+  async function onRecordPlaceholder() {
+    if (dialogueId == null) return
+    onError(null)
+    try {
+      await uploadAttemptAudio({
+        dialogueId,
+        mode: 'role_play',
+        file: new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/webm' }),
+      })
+      setNote('Attempt audio uploaded (placeholder sample). Pha 2 scoring soon.')
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Upload failed')
+    }
+  }
+
+  return (
+    <section className="mt-8 border-t border-slate-200 pt-8">
+      <h2 className="text-xl font-semibold tracking-tight">Learner practice</h2>
+      <p className="mt-1 text-sm text-slate-600">
+        Browse published cases, karaoke with word sync, then 10 shadowing cards.
+      </p>
+
+      <div className="mt-4 grid gap-3 text-sm">
+        <label>
+          Lessons / week
+          <input
+            type="number"
+            min={1}
+            max={14}
+            className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+            value={lessonsPerWeek}
+            onChange={(e) => setLessonsPerWeek(Number(e.target.value))}
+          />
+        </label>
+        <label>
+          CEFR package
+          <select
+            className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+            value={cefrPackage}
+            onChange={(e) => setCefrPackage(e.target.value as CefrLevel)}
+          >
+            <option value="A2">A2</option>
+            <option value="B1">B1</option>
+            <option value="C1">C1</option>
+          </select>
+        </label>
+        <button
+          type="button"
+          onClick={() => void onSaveProfile()}
+          className="w-fit rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
+        >
+          Save 6-month path
+        </button>
+      </div>
+
+      {cases.length === 0 ? (
+        <p className="mt-4 text-sm text-slate-500">
+          No published cases yet. Ask an editor to publish one.
+        </p>
+      ) : (
+        <div className="mt-6 flex flex-col gap-3">
+          <label className="text-sm">
+            Published case
+            <select
+              className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+              value={caseId ?? ''}
+              onChange={(e) => setCaseId(Number(e.target.value))}
+            >
+              {cases.map((c) => (
+                <option key={c.id} value={c.id}>
+                  #{c.id} — {c.title}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm">
+            Dialogue
+            <select
+              className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+              value={dialogueId ?? ''}
+              onChange={(e) => setDialogueId(Number(e.target.value))}
+            >
+              {dialogues.map((d) => (
+                <option key={d.id} value={d.id}>
+                  #{d.id} — {d.context} ({d.cefr_level})
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
+
+      {lesson ? (
+        <div className="mt-6">
+          <div className="rounded-lg bg-gradient-to-br from-teal-50 via-white to-orange-50 p-4">
+            <p className="text-xs uppercase tracking-wide text-slate-500">
+              Clinic scene
+            </p>
+            <h3 className="mt-1 text-lg font-semibold">{lesson.title}</h3>
+            <p className="mt-1 text-xs text-slate-500">
+              ISBN {lesson.isbn} · edition {lesson.edition}
+              {lesson.citation_pages.length
+                ? ` · pages ${lesson.citation_pages.join(', ')}`
+                : ''}
+            </p>
+
+            <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
+              <label>
+                Speed
+                <input
+                  type="range"
+                  min={0.5}
+                  max={1.25}
+                  step={0.05}
+                  value={speed}
+                  onChange={(e) => setSpeed(Number(e.target.value))}
+                  className="ml-2 align-middle"
+                />
+                <span className="ml-2">{speed.toFixed(2)}×</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={showVi}
+                  onChange={(e) => setShowVi(e.target.checked)}
+                />
+                Show VI gloss
+              </label>
+            </div>
+
+            {current ? (
+              <div className="mt-4">
+                <p className={`font-medium ${speakerColor}`}>{current.speaker}</p>
+                <p className="mt-2 text-base leading-relaxed">
+                  {current.timestamps.map((stamp, idx) => (
+                    <span
+                      key={`${stamp.word}-${idx}`}
+                      className={
+                        idx === activeWord
+                          ? 'bg-teal-200 text-teal-950'
+                          : undefined
+                      }
+                    >
+                      {stamp.word}{' '}
+                    </span>
+                  ))}
+                </p>
+                {showVi && current.text_vi ? (
+                  <p className="mt-1 text-sm text-slate-600">{current.text_vi}</p>
+                ) : null}
+                <audio ref={audioRef} controls className="mt-3 w-full" />
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    className="text-sm underline"
+                    disabled={lineIndex <= 0}
+                    onClick={() => setLineIndex((v) => Math.max(0, v - 1))}
+                  >
+                    Prev line
+                  </button>
+                  <button
+                    type="button"
+                    className="text-sm underline"
+                    disabled={lineIndex >= lesson.playlist.length - 1}
+                    onClick={() =>
+                      setLineIndex((v) =>
+                        Math.min(lesson.playlist.length - 1, v + 1),
+                      )
+                    }
+                  >
+                    Next line
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="mt-6">
+            <h3 className="text-base font-semibold">Shadowing (10 cards)</h3>
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {cards.map((card) => (
+                <button
+                  key={card.card_index}
+                  type="button"
+                  onClick={() => setCardIndex(card.card_index)}
+                  className={`border-l-2 pl-3 text-left text-sm ${
+                    card.card_index === cardIndex
+                      ? 'border-orange-500'
+                      : 'border-slate-300'
+                  }`}
+                >
+                  <p className="font-medium">{card.speaker}</p>
+                  <p className="text-slate-700">{card.text}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-6 border-t border-slate-200 pt-4">
+            <h3 className="text-base font-semibold">Role-play (placeholder)</h3>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div className="border-l-2 border-teal-600 pl-3 text-sm">
+                <p className="font-medium">AI script</p>
+                <p className="mt-1 text-slate-600">
+                  {current?.text ?? 'Select a dialogue line'}
+                </p>
+              </div>
+              <div className="border-l-2 border-orange-500 pl-3 text-sm">
+                <p className="font-medium">Your mic</p>
+                <p className="mt-1 text-slate-500">Pha 2 scoring sắp có</p>
+                <button
+                  type="button"
+                  className="mt-2 text-sm underline"
+                  onClick={() => void onRecordPlaceholder()}
+                >
+                  Upload sample attempt
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => void onComplete()}
+            className="mt-4 rounded-md bg-teal-700 px-3 py-2 text-sm font-medium text-white hover:bg-teal-600"
+          >
+            Mark karaoke + shadowing complete
+          </button>
+        </div>
+      ) : null}
+
+      {note ? <p className="mt-3 text-sm text-slate-600">{note}</p> : null}
+    </section>
+  )
+}

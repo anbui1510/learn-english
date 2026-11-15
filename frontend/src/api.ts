@@ -281,3 +281,184 @@ export async function listCaseDialogues(
   }
   return (await response.json()) as DialogueArtifact[]
 }
+
+export async function synthesizeDialogue(
+  caseId: number,
+  dialogueId: number,
+): Promise<unknown[]> {
+  const response = await fetch(
+    `${API_BASE}/editor/cases/${caseId}/dialogues/${dialogueId}/synthesize`,
+    { method: 'POST', credentials: 'include' },
+  )
+  if (!response.ok) {
+    throw new Error(`Synthesize failed (${response.status})`)
+  }
+  return (await response.json()) as unknown[]
+}
+
+export type PublishedCase = {
+  id: number
+  title: string
+  isbn: string | null
+  edition: string | null
+  published_at: string | null
+}
+
+export type WordStamp = {
+  word: string
+  offset_ms: number
+  duration_ms: number
+}
+
+export type PlaylistItem = {
+  line_index: number
+  speaker: string
+  voice: string
+  text: string
+  text_vi?: string | null
+  audio_url: string
+  duration_ms: number
+  timestamps: WordStamp[]
+  fact_ids: string[]
+}
+
+export type Lesson = {
+  case_id: number
+  dialogue_id: number
+  title: string
+  context: string
+  cefr_level: string
+  isbn: string | null
+  edition: string | null
+  citation_pages: number[]
+  playlist: PlaylistItem[]
+}
+
+export type ShadowingCard = {
+  card_index: number
+  line_index: number
+  speaker: string
+  text: string
+  text_vi?: string
+  fact_ids: string[]
+  is_key_phrase: boolean
+}
+
+export type LearnerProfile = {
+  user_id: number
+  lessons_per_week: number
+  cefr_package: CefrLevel
+  path_months: number
+}
+
+export async function listPublishedCases(): Promise<PublishedCase[]> {
+  const response = await fetch(`${API_BASE}/learner/cases`, {
+    credentials: 'include',
+  })
+  if (!response.ok) {
+    throw new Error(`Failed to list published cases (${response.status})`)
+  }
+  return (await response.json()) as PublishedCase[]
+}
+
+export async function listLearnerCaseDialogues(
+  caseId: number,
+): Promise<
+  { id: number; case_id: number; context: string; cefr_level: string }[]
+> {
+  const response = await fetch(
+    `${API_BASE}/learner/cases/${caseId}/dialogues`,
+    { credentials: 'include' },
+  )
+  if (!response.ok) {
+    throw new Error(`Failed to list dialogues (${response.status})`)
+  }
+  return (await response.json()) as {
+    id: number
+    case_id: number
+    context: string
+    cefr_level: string
+  }[]
+}
+
+export async function fetchLesson(dialogueId: number): Promise<Lesson> {
+  const response = await fetch(
+    `${API_BASE}/learner/dialogues/${dialogueId}/lesson`,
+    { credentials: 'include' },
+  )
+  if (!response.ok) {
+    throw new Error(`Failed to load lesson (${response.status})`)
+  }
+  return (await response.json()) as Lesson
+}
+
+export async function fetchShadowing(
+  dialogueId: number,
+): Promise<ShadowingCard[]> {
+  const response = await fetch(
+    `${API_BASE}/learner/dialogues/${dialogueId}/shadowing`,
+    { credentials: 'include' },
+  )
+  if (!response.ok) {
+    throw new Error(`Failed to load shadowing (${response.status})`)
+  }
+  const body = (await response.json()) as { cards: ShadowingCard[] }
+  return body.cards
+}
+
+export async function fetchLearnerProfile(): Promise<LearnerProfile> {
+  const response = await fetch(`${API_BASE}/learner/profile`, {
+    credentials: 'include',
+  })
+  if (!response.ok) {
+    throw new Error(`Failed to load profile (${response.status})`)
+  }
+  return (await response.json()) as LearnerProfile
+}
+
+export async function patchLearnerProfile(body: {
+  lessons_per_week?: number
+  cefr_package?: CefrLevel
+}): Promise<LearnerProfile> {
+  const response = await fetch(`${API_BASE}/learner/profile`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!response.ok) {
+    throw new Error(`Failed to update profile (${response.status})`)
+  }
+  return (await response.json()) as LearnerProfile
+}
+
+export async function completeLesson(dialogueId: number): Promise<void> {
+  const response = await fetch(`${API_BASE}/learner/completions`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dialogue_id: dialogueId }),
+  })
+  if (!response.ok) {
+    throw new Error(`Failed to complete lesson (${response.status})`)
+  }
+}
+
+export async function uploadAttemptAudio(input: {
+  dialogueId: number
+  mode: 'shadowing' | 'role_play'
+  file: Blob
+}): Promise<void> {
+  const body = new FormData()
+  body.set('dialogue_id', String(input.dialogueId))
+  body.set('mode', input.mode)
+  body.set('file', input.file, 'attempt.webm')
+  const response = await fetch(`${API_BASE}/learner/attempts/audio`, {
+    method: 'POST',
+    credentials: 'include',
+    body,
+  })
+  if (!response.ok) {
+    throw new Error(`Attempt upload failed (${response.status})`)
+  }
+}

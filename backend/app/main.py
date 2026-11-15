@@ -12,6 +12,9 @@ from app.cases.service import get_case_repository
 from app.dialogues.service import get_dialogue_repository
 from app.editor.router import router as editor_router
 from app.facts.service import get_fact_repository
+from app.learner.router import router as learner_router
+from app.learner.service import get_learner_profile_repository
+from app.speech.service import get_utterance_repository
 from app.storage.router import router as storage_router
 from app.users.service import get_user_repository
 
@@ -25,6 +28,8 @@ def create_app(settings: AuthSettings | None = None) -> FastAPI:
         get_case_repository()
         get_fact_repository()
         get_dialogue_repository()
+        get_utterance_repository()
+        get_learner_profile_repository()
         yield
 
     application = FastAPI(
@@ -50,6 +55,7 @@ def create_app(settings: AuthSettings | None = None) -> FastAPI:
     application.include_router(auth_router)
     application.include_router(admin_router)
     application.include_router(editor_router)
+    application.include_router(learner_router)
     application.include_router(storage_router)
 
     @application.get("/health")

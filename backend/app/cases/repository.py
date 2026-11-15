@@ -148,6 +148,17 @@ class CaseRepository:
             ).fetchall()
             return [_row_to_case(row) for row in rows]
 
+    def list_published(self) -> list[CaseRecord]:
+        with self._conn() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM cases
+                WHERE status = 'published'
+                ORDER BY id ASC
+                """
+            ).fetchall()
+            return [_row_to_case(row) for row in rows]
+
     def set_extract_status(
         self,
         case_id: int,

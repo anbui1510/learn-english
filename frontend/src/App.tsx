@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { AdminUsers } from './AdminUsers'
 import { EditorFacts } from './EditorFacts'
 import { EditorUpload } from './EditorUpload'
+import { LearnerPanel } from './LearnerPanel'
 import { fetchMe, loginUrl, logout, type AuthUser } from './api'
 
 function App() {
@@ -56,7 +57,7 @@ function App() {
           Medical English practice
         </h1>
         <p className="max-w-prose text-slate-600">
-          Sign in with Google. Editors upload Nelson PDFs; admins assign roles.
+          Sign in with Google. Editors publish Nelson cases; learners practice karaoke and shadowing.
         </p>
 
         <div className="flex flex-wrap items-center gap-3 pt-2">
@@ -100,6 +101,7 @@ function App() {
             <EditorFacts onError={handleError} />
           </>
         ) : null}
+        {user ? <LearnerPanel onError={handleError} /> : null}
       </div>
     </main>
   )

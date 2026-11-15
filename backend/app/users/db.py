@@ -89,6 +89,59 @@ CREATE TABLE IF NOT EXISTS dialogues (
     updated_at TEXT NOT NULL,
     FOREIGN KEY(case_id) REFERENCES cases(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS utterances (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    dialogue_id INTEGER NOT NULL,
+    line_index INTEGER NOT NULL,
+    speaker TEXT NOT NULL,
+    voice TEXT NOT NULL,
+    object_key TEXT NOT NULL,
+    content_type TEXT NOT NULL,
+    duration_ms INTEGER NOT NULL,
+    timestamps_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(dialogue_id, line_index),
+    FOREIGN KEY(dialogue_id) REFERENCES dialogues(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS learner_profiles (
+    user_id INTEGER PRIMARY KEY,
+    lessons_per_week INTEGER NOT NULL DEFAULT 3,
+    cefr_package TEXT NOT NULL DEFAULT 'B1'
+        CHECK(cefr_package IN ('A2', 'B1', 'C1')),
+    path_months INTEGER NOT NULL DEFAULT 6,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS lesson_completions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    case_id INTEGER NOT NULL,
+    dialogue_id INTEGER NOT NULL,
+    completed_at TEXT NOT NULL,
+    UNIQUE(user_id, dialogue_id),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(case_id) REFERENCES cases(id) ON DELETE CASCADE,
+    FOREIGN KEY(dialogue_id) REFERENCES dialogues(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS learning_attempts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    case_id INTEGER NOT NULL,
+    dialogue_id INTEGER NOT NULL,
+    mode TEXT NOT NULL CHECK(mode IN ('shadowing', 'role_play')),
+    audio_object_key TEXT NOT NULL,
+    audio_content_type TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(case_id) REFERENCES cases(id) ON DELETE CASCADE,
+    FOREIGN KEY(dialogue_id) REFERENCES dialogues(id) ON DELETE CASCADE
+);
 """
 
 _CASE_COLUMNS: dict[str, str] = {

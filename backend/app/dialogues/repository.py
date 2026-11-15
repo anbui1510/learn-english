@@ -119,3 +119,10 @@ class DialogueRepository:
                 (case_id,),
             ).fetchall()
             return [_row_to_dialogue(row) for row in rows]
+
+    def get_by_id(self, dialogue_id: int) -> DialogueRecord | None:
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM dialogues WHERE id = ?", (dialogue_id,)
+            ).fetchone()
+            return _row_to_dialogue(row) if row else None
