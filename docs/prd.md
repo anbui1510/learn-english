@@ -226,7 +226,7 @@ Web app giúp **bác sĩ nội trú** luyện tiếng Anh giao tiếp y khoa t�
 | ID | User Story | Acceptance Criteria |
 |----|------------|---------------------|
 | US-G2-001 | Là **learner**, sau khi ghi âm, tôi nhận **điểm Azure PA** (pronunciation, completeness, prosody), để biết mức chính xác. | Gọi Azure SDK server-side; không lộ key client. |
-| US-G2-002 | Là **hệ thống**, với **CEFR cao**, tôi đánh giá **stress_pattern** trên thuật ngữ dài, để ví dụ *electro**car**diogram* đúng trọng âm. | C1 lines store `stress_pattern`; PA `stress_hint` only when prosody &lt;75 or stressed word not green. |
+| US-G2-002 | Là **hệ thống**, với **CEFR cao**, tôi đánh giá **stress_pattern** trên thuật ngữ dài, để ví dụ *electro**car**diogram* đúng trọng âm. | C1 lines store `stress_pattern` (lesson playlist + karaoke underline); PA `stress_hint` only when prosody &lt;75 or stressed word not green. |
 | US-G2-003 | Là **admin**, tôi giới hạn **số lần chấm/phút** mỗi user/ngày, để kiểm soát chi phí Azure. | Rate limit + metric dashboard. |
 
 ---

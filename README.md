@@ -108,7 +108,7 @@ Roles persist in SQLite (`DATABASE_PATH`, default `backend/data/learn_english.sq
 
 TTS defaults to a silent-WAV synthetic engine (CI-safe). Set `USE_EDGE_TTS=true` and install optional `edge-tts` to use the async Edge adapter (falls back to synthetic on missing SDK/network errors).
 
-**Pha 2 pronunciation:** upload/score returns pronunciation / completeness / prosody plus per-word green/yellow/red bands. C1 lines may include `stress_pattern`; `stress_hint` only when prosody &lt;75 or the stressed word is not green. Default engine is synthetic (CI-safe). Set `USE_AZURE_PA=true` + `AZURE_SPEECH_KEY` (optional `uv sync --group speech`) for Azure. `PA_DAILY_LIMIT` caps score calls per user/day.
+**Pha 2 pronunciation:** upload/score returns pronunciation / completeness / prosody plus per-word green/yellow/red bands. C1 lines may include `stress_pattern` (exposed on lesson playlist); karaoke underlines primary stress; PA `stress_hint` only when prosody &lt;75 or the stressed word is not green. Default engine is synthetic (CI-safe). Set `USE_AZURE_PA=true` + `AZURE_SPEECH_KEY` (optional `uv sync --group speech`) for Azure. `PA_DAILY_LIMIT` caps score calls per user/day.
 
 **Pha 2 learning loop:** red/yellow PA words enqueue SRS cards (first due T+1). Done advances SM-2 lite intervals (1→3→7→14); a new miss resets. Role-play supports `read_along` vs `free_speech`; free speech adds empathy rubric + clinical disclaimer (`USE_GEMINI_EMPATHY` + `GEMINI_API_KEY` for Gemini; synthetic fallback).
 

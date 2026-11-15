@@ -29,6 +29,7 @@ import {
 } from './api'
 import { ensureMicrophonePermission, isNativePlatform } from './mobile'
 import { resolveLessonAudioUrl } from './offlineCache'
+import { peakStressIndexes, stressPatternAligns } from './stressHighlight'
 
 type Props = {
   onError: (message: string | null) => void
@@ -73,8 +74,30 @@ export function LearnerPanel({ onError }: Props) {
   const mediaStreamRef = useRef<MediaStream | null>(null)
 
   const current = lesson?.playlist[lineIndex] ?? null
+  const stressPeaks = useMemo(() => {
+    if (!current || lesson?.cefr_level !== 'C1') return new Set<number>()
+    if (!stressPatternAligns(current.stress_pattern, current.timestamps.length)) {
+      return new Set<number>()
+    }
+    return peakStressIndexes(current.stress_pattern)
+  }, [current, lesson?.cefr_level])
+
+  const stressedWordsLabel = useMemo(() => {
+    if (!current || stressPeaks.size === 0) return ''
+    return [...stressPeaks]
+      .map((i) => current.timestamps[i]?.word)
+      .filter(Boolean)
+      .join(', ')
+  }, [current, stressPeaks])
+
   const karaokeLiveLabel = current
-    ? `Line ${lineIndex + 1} of ${lesson?.playlist.length ?? 0}. ${current.speaker}: ${current.text}`
+    ? [
+        `Line ${lineIndex + 1} of ${lesson?.playlist.length ?? 0}.`,
+        `${current.speaker}: ${current.text}`,
+        stressedWordsLabel ? `Primary stress on: ${stressedWordsLabel}.` : '',
+      ]
+        .filter(Boolean)
+        .join(' ')
     : ''
   const speakerColor = useMemo(() => {
     if (!current) return 'text-teal-800'
@@ -665,19 +688,30 @@ export function LearnerPanel({ onError }: Props) {
                   {karaokeLiveLabel}
                 </p>
                 <p className="mt-2 text-base leading-relaxed text-slate-900" aria-hidden="true">
-                  {current.timestamps.map((stamp, idx) => (
-                    <span
-                      key={`${stamp.word}-${idx}`}
-                      className={
-                        idx === activeWord
-                          ? 'rounded-sm bg-teal-800 px-0.5 font-semibold text-white'
-                          : undefined
-                      }
-                    >
-                      {stamp.word}{' '}
-                    </span>
-                  ))}
+                  {current.timestamps.map((stamp, idx) => {
+                    const isActive = idx === activeWord
+                    const isStressed = stressPeaks.has(idx)
+                    let className: string | undefined
+                    if (isActive) {
+                      className =
+                        'rounded-sm bg-teal-800 px-0.5 font-semibold text-white'
+                    } else if (isStressed) {
+                      className =
+                        'font-semibold text-teal-900 underline decoration-teal-700 decoration-2 underline-offset-2'
+                    }
+                    return (
+                      <span key={`${stamp.word}-${idx}`} className={className}>
+                        {stamp.word}{' '}
+                      </span>
+                    )
+                  })}
                 </p>
+                {stressedWordsLabel ? (
+                  <p className="mt-1 text-xs text-slate-600">
+                    C1 stress: underline marks primary stress (
+                    {stressedWordsLabel})
+                  </p>
+                ) : null}
                 {showVi && current.text_vi ? (
                   <p className="mt-1 text-sm text-slate-700">{current.text_vi}</p>
                 ) : null}

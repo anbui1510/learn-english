@@ -76,6 +76,7 @@ class PlaylistItemOut(BaseModel):
     duration_ms: int
     timestamps: list[dict[str, Any]]
     fact_ids: list[str]
+    stress_pattern: list[int] | None = None
 
 
 class LessonOut(BaseModel):
@@ -467,6 +468,13 @@ def get_lesson(
     playlist: list[PlaylistItemOut] = []
     for utt in utterances:
         line = lines[utt.line_index] if utt.line_index < len(lines) else {}
+        raw_stress = line.get("stress_pattern")
+        stress: list[int] | None = None
+        if isinstance(raw_stress, list) and raw_stress:
+            try:
+                stress = [int(x) for x in raw_stress]
+            except (TypeError, ValueError):
+                stress = None
         playlist.append(
             PlaylistItemOut(
                 line_index=utt.line_index,
@@ -480,6 +488,7 @@ def get_lesson(
                 duration_ms=utt.duration_ms,
                 timestamps=utt.timestamps,
                 fact_ids=list(line.get("fact_ids") or []),
+                stress_pattern=stress,
             )
         )
     raw_kind = str(dialogue.payload.get("session_kind") or "standard")

@@ -481,6 +481,7 @@ export type PlaylistItem = {
   duration_ms: number
   timestamps: WordStamp[]
   fact_ids: string[]
+  stress_pattern?: number[] | null
 }
 
 export type Lesson = {
