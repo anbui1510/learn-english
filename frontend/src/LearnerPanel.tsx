@@ -3,6 +3,7 @@ import {
   certificateShareUrl,
   completeLesson,
   completeSrsCard,
+  exportDialogueVideo,
   fetchLearnerProfile,
   fetchLesson,
   fetchProgression,
@@ -256,6 +257,25 @@ export function LearnerPanel({ onError }: Props) {
       setNote(`Lesson complete · ${bits.join(' · ')}`)
     } catch (err) {
       onError(err instanceof Error ? err.message : 'Failed to complete')
+    }
+  }
+
+  async function onExportVideo() {
+    if (dialogueId == null) return
+    onError(null)
+    try {
+      setNote('Exporting 1080p MP4…')
+      const job = await exportDialogueVideo(dialogueId)
+      if (job.status === 'succeeded' && job.download_url) {
+        setNote(`Export ready (${job.width}×${job.height}, ${job.engine})`)
+        window.open(job.download_url, '_blank', 'noopener,noreferrer')
+      } else if (job.status === 'failed') {
+        onError(job.error ?? 'Export failed')
+      } else {
+        setNote(`Export ${job.status}`)
+      }
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Export failed')
     }
   }
 
@@ -803,13 +823,22 @@ export function LearnerPanel({ onError }: Props) {
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={() => void onComplete()}
-            className="mt-4 rounded-md bg-teal-700 px-3 py-2 text-sm font-medium text-white hover:bg-teal-600"
-          >
-            Mark karaoke + shadowing complete
-          </button>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void onComplete()}
+              className="rounded-md bg-teal-700 px-3 py-2 text-sm font-medium text-white hover:bg-teal-600"
+            >
+              Mark karaoke + shadowing complete
+            </button>
+            <button
+              type="button"
+              onClick={() => void onExportVideo()}
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100"
+            >
+              Export 1080p MP4
+            </button>
+          </div>
         </div>
       ) : null}
 

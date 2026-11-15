@@ -218,6 +218,25 @@ CREATE TABLE IF NOT EXISTS certificates (
     UNIQUE(user_id, module_slug),
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS video_exports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    dialogue_id INTEGER NOT NULL,
+    case_id INTEGER NOT NULL,
+    status TEXT NOT NULL
+        CHECK(status IN ('queued', 'running', 'succeeded', 'failed')),
+    object_key TEXT,
+    error TEXT,
+    width INTEGER NOT NULL DEFAULT 1920,
+    height INTEGER NOT NULL DEFAULT 1080,
+    engine TEXT NOT NULL DEFAULT 'ffmpeg',
+    created_at TEXT NOT NULL,
+    finished_at TEXT,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(dialogue_id) REFERENCES dialogues(id) ON DELETE CASCADE,
+    FOREIGN KEY(case_id) REFERENCES cases(id) ON DELETE CASCADE
+);
 """
 
 _ATTEMPT_COLUMNS: dict[str, str] = {

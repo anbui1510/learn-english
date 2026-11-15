@@ -677,6 +677,84 @@ def replay_word_snippet(
     )
 
 
+class VideoExportOut(BaseModel):
+    id: int
+    dialogue_id: int
+    case_id: int
+    status: str
+    download_url: str | None = None
+    error: str | None = None
+    width: int
+    height: int
+    engine: str
+    created_at: str
+    finished_at: str | None = None
+
+
+def _video_export_out(job) -> VideoExportOut:
+    settings = get_auth_settings()
+    url = None
+    if job.status == "succeeded" and job.object_key:
+        url = get_storage().signed_url(
+            job.object_key, expires_in=settings.signed_url_ttl_seconds
+        )
+    return VideoExportOut(
+        id=job.id,
+        dialogue_id=job.dialogue_id,
+        case_id=job.case_id,
+        status=job.status,
+        download_url=url,
+        error=job.error,
+        width=job.width,
+        height=job.height,
+        engine=job.engine,
+        created_at=job.created_at,
+        finished_at=job.finished_at,
+    )
+
+
+@router.post(
+    "/dialogues/{dialogue_id}/export-video",
+    response_model=VideoExportOut,
+    status_code=201,
+)
+def enqueue_video_export(
+    dialogue_id: int,
+    user: Annotated[UserRecord, Depends(require_learner_access)],
+) -> VideoExportOut:
+    """Queue a 1080p karaoke/shadowing MP4 export (ffmpeg now; Remotion-ready)."""
+    from app.video.service import get_video_export_repository, run_export_job
+
+    case, dialogue = _require_published_dialogue(dialogue_id)
+    _assert_unlocked(user, case)
+    job = get_video_export_repository().create(
+        user_id=user.id,
+        dialogue_id=dialogue.id,
+        case_id=case.id,
+        width=1920,
+        height=1080,
+        engine="ffmpeg",
+    )
+    # MVP: process inline so CI/demo do not need a worker process.
+    finished = run_export_job(job.id)
+    return _video_export_out(finished)
+
+
+@router.get("/video-exports/{job_id}", response_model=VideoExportOut)
+def get_video_export(
+    job_id: int,
+    user: Annotated[UserRecord, Depends(require_learner_access)],
+) -> VideoExportOut:
+    from app.video.service import get_video_export_repository
+
+    job = get_video_export_repository().get(job_id)
+    if job is None or job.user_id != user.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Export not found"
+        )
+    return _video_export_out(job)
+
+
 @router.post("/empathy/sample-audio", response_model=EmpathySampleOut)
 def synthesize_empathy_sample(
     body: EmpathySampleIn,

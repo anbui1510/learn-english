@@ -123,6 +123,8 @@ TTS defaults to a silent-WAV synthetic engine (CI-safe). Set `USE_EDGE_TTS=true`
 
 **Pha 3 book sources:** `book_sources` seeds Nelson / Harriet Lane / WHO; admins CRUD via `/admin/book-sources`; editors tag cases on upload (`book_source_id`) while facts keep per-case ISBN metadata.
 
+**Pha 3 video export:** `POST /learner/dialogues/{id}/export-video` queues a 1920×1080 MP4 job (ffmpeg karaoke compose today; Remotion stub under `video/remotion/` for later swap).
+
 ### Google OAuth setup (manual verify)
 
 1. Create an OAuth 2.0 **Web application** client in Google Cloud Console.

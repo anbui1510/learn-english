@@ -773,3 +773,30 @@ export async function completeSrsCard(cardId: number): Promise<void> {
     throw new Error(`Failed to complete SRS card (${response.status})`)
   }
 }
+
+export type VideoExportJob = {
+  id: number
+  dialogue_id: number
+  case_id: number
+  status: string
+  download_url?: string | null
+  error?: string | null
+  width: number
+  height: number
+  engine: string
+  created_at: string
+  finished_at?: string | null
+}
+
+export async function exportDialogueVideo(
+  dialogueId: number,
+): Promise<VideoExportJob> {
+  const response = await fetch(
+    `${API_BASE}/learner/dialogues/${dialogueId}/export-video`,
+    { method: 'POST', credentials: 'include' },
+  )
+  if (!response.ok) {
+    throw new Error(`Video export failed (${response.status})`)
+  }
+  return (await response.json()) as VideoExportJob
+}
