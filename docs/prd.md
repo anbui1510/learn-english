@@ -321,7 +321,7 @@ Web app giúp **bác sĩ nội trú** luyện tiếng Anh giao tiếp y khoa t�
 
 | ID | User Story | Acceptance Criteria |
 |----|------------|---------------------|
-| US-G3-030 | Là **learner**, tôi học trên **app mobile** với karaoke + shadowing, để học khi di chuyển. | API parity; offline cache optional phase. |
+| US-G3-030 | Là **learner**, tôi học trên **app mobile** với karaoke + shadowing, để học khi di chuyển. | Capacitor wrap of Vite UI (`frontend/android`); mic `RECORD_AUDIO`; CORS origins for WebView; API parity; offline cache optional phase. |
 
 ### Epic E-G3-05: Premium voice
 

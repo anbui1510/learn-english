@@ -127,6 +127,8 @@ TTS defaults to a silent-WAV synthetic engine (CI-safe). Set `USE_EDGE_TTS=true`
 
 **Pha 3 premium TTS:** org `tts_provider` + `premium_enabled` cost flag (`/admin/tts-settings`). Providers: synthetic / edge / Azure Neural / ElevenLabs (keys via env; premium gate required for paid engines).
 
+**Pha 3 mobile (Capacitor):** Android shell under `frontend/android/` wraps the Vite build (`npm run cap:android`). See [docs/mobile-capacitor.md](docs/mobile-capacitor.md).
+
 ### Google OAuth setup (manual verify)
 
 1. Create an OAuth 2.0 **Web application** client in Google Cloud Console.

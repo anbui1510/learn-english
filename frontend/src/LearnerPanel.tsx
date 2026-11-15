@@ -26,6 +26,7 @@ import {
   type SkillTreeNode,
   type SrsCard,
 } from './api'
+import { ensureMicrophonePermission, isNativePlatform } from './mobile'
 
 type Props = {
   onError: (message: string | null) => void
@@ -299,6 +300,13 @@ export function LearnerPanel({ onError }: Props) {
     }
 
     try {
+      if (isNativePlatform()) {
+        const ok = await ensureMicrophonePermission()
+        if (!ok) {
+          onError('Microphone permission denied. Enable mic for LearnEnglish in system settings.')
+          return
+        }
+      }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       mediaStreamRef.current = stream
       mediaChunksRef.current = []

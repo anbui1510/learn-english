@@ -4,5 +4,7 @@ import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Relative asset paths so Capacitor Android/iOS WebViews load the bundle.
+  base: './',
   plugins: [react(), tailwindcss()],
 })

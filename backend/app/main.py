@@ -45,9 +45,12 @@ def create_app(settings: AuthSettings | None = None) -> FastAPI:
         same_site="lax",
         https_only=resolved.cookie_secure,
     )
+    cors_origins = list(
+        dict.fromkeys([resolved.frontend_origin, *resolved.frontend_origins])
+    )
     application.add_middleware(
         CORSMiddleware,
-        allow_origins=[resolved.frontend_origin],
+        allow_origins=cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

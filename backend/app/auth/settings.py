@@ -25,6 +25,7 @@ class AuthSettings:
     jwt_secret: str
     session_secret: str
     frontend_origin: str
+    frontend_origins: tuple[str, ...]
     cookie_name: str
     cookie_secure: bool
     cookie_max_age: int
@@ -72,6 +73,12 @@ def _parse_samesite(value: str) -> SameSite:
     return "lax"
 
 
+def _parse_origins(value: str) -> tuple[str, ...]:
+    parts = [p.strip() for p in value.split(",") if p.strip()]
+    # Always include primary FRONTEND_ORIGIN when list is built from env later.
+    return tuple(dict.fromkeys(parts))
+
+
 @lru_cache
 def get_auth_settings() -> AuthSettings:
     return AuthSettings(
@@ -83,7 +90,24 @@ def get_auth_settings() -> AuthSettings:
         ),
         jwt_secret=_env("JWT_SECRET"),
         session_secret=_env("SESSION_SECRET") or _env("JWT_SECRET"),
-        frontend_origin=_env("FRONTEND_ORIGIN", "http://127.0.0.1:5173"),
+        frontend_origin=(
+            primary := _env("FRONTEND_ORIGIN", "http://127.0.0.1:5173")
+        ),
+        frontend_origins=tuple(
+            dict.fromkeys(
+                [
+                    primary,
+                    *_parse_origins(
+                        _env(
+                            "FRONTEND_ORIGINS",
+                            # Capacitor Android: https://localhost; iOS: capacitor://localhost
+                            "http://localhost:5173,https://localhost,"
+                            "capacitor://localhost,ionic://localhost",
+                        )
+                    ),
+                ]
+            )
+        ),
         cookie_name=_env("COOKIE_NAME", "le_session"),
         cookie_secure=_env("COOKIE_SECURE", "false").lower() in {"1", "true", "yes"},
         cookie_max_age=int(_env("COOKIE_MAX_AGE", "86400")),
