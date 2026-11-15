@@ -219,6 +219,12 @@ CREATE TABLE IF NOT EXISTS certificates (
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS org_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS video_exports (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
@@ -359,4 +365,31 @@ def init_db(conn: sqlite3.Connection) -> None:
             conn.execute(f"ALTER TABLE learning_attempts ADD COLUMN {name} {col_type}")
     _migrate_facts_status_rejected(conn)
     _seed_book_sources(conn)
+    _seed_org_tts_defaults(conn)
     conn.commit()
+
+
+def _seed_org_tts_defaults(conn: sqlite3.Connection) -> None:
+    from app.auth.settings import get_auth_settings
+
+    now = datetime.now(UTC).isoformat()
+    try:
+        default_provider = get_auth_settings().tts_provider_default or "synthetic"
+    except Exception:  # noqa: BLE001
+        default_provider = "synthetic"
+    if default_provider not in {"synthetic", "edge", "azure", "elevenlabs"}:
+        default_provider = "synthetic"
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO org_settings (key, value, updated_at)
+        VALUES ('tts_provider', ?, ?)
+        """,
+        (default_provider, now),
+    )
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO org_settings (key, value, updated_at)
+        VALUES ('tts_premium_enabled', 'false', ?)
+        """,
+        (now,),
+    )

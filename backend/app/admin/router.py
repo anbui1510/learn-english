@@ -153,6 +153,58 @@ def _book_out(source) -> BookSourceOut:
     )
 
 
+class TtsSettingsOut(BaseModel):
+    provider: Literal["synthetic", "edge", "azure", "elevenlabs"]
+    premium_enabled: bool
+    updated_at: str | None = None
+    notes: str = (
+        "Premium providers (azure/elevenlabs) require premium_enabled=true "
+        "and matching API keys in env."
+    )
+
+
+class TtsSettingsPatchIn(BaseModel):
+    provider: Literal["synthetic", "edge", "azure", "elevenlabs"] | None = None
+    premium_enabled: bool | None = None
+
+
+@router.get("/tts-settings", response_model=TtsSettingsOut)
+def get_tts_settings(
+    _: Annotated[UserRecord, Depends(require_admin)],
+) -> TtsSettingsOut:
+    from app.org_settings.service import get_tts_org_settings
+
+    settings = get_tts_org_settings()
+    return TtsSettingsOut(
+        provider=settings.provider,  # type: ignore[arg-type]
+        premium_enabled=settings.premium_enabled,
+        updated_at=settings.updated_at,
+    )
+
+
+@router.patch("/tts-settings", response_model=TtsSettingsOut)
+def patch_tts_settings(
+    body: TtsSettingsPatchIn,
+    _: Annotated[UserRecord, Depends(require_admin)],
+) -> TtsSettingsOut:
+    from app.org_settings.service import get_org_settings_repository
+
+    try:
+        updated = get_org_settings_repository().set_tts(
+            provider=body.provider,
+            premium_enabled=body.premium_enabled,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
+    return TtsSettingsOut(
+        provider=updated.provider,  # type: ignore[arg-type]
+        premium_enabled=updated.premium_enabled,
+        updated_at=updated.updated_at,
+    )
+
+
 @router.get("/book-sources", response_model=list[BookSourceOut])
 def list_book_sources(
     _: Annotated[UserRecord, Depends(require_admin)],

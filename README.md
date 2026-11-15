@@ -125,6 +125,8 @@ TTS defaults to a silent-WAV synthetic engine (CI-safe). Set `USE_EDGE_TTS=true`
 
 **Pha 3 video export:** `POST /learner/dialogues/{id}/export-video` queues a 1920×1080 MP4 job (ffmpeg karaoke compose today; Remotion stub under `video/remotion/` for later swap).
 
+**Pha 3 premium TTS:** org `tts_provider` + `premium_enabled` cost flag (`/admin/tts-settings`). Providers: synthetic / edge / Azure Neural / ElevenLabs (keys via env; premium gate required for paid engines).
+
 ### Google OAuth setup (manual verify)
 
 1. Create an OAuth 2.0 **Web application** client in Google Cloud Console.

@@ -129,6 +129,41 @@ export type BookSource = {
   notes?: string | null
 }
 
+export type TtsProvider = 'synthetic' | 'edge' | 'azure' | 'elevenlabs'
+
+export type TtsSettings = {
+  provider: TtsProvider
+  premium_enabled: boolean
+  updated_at?: string | null
+  notes?: string
+}
+
+export async function fetchTtsSettings(): Promise<TtsSettings> {
+  const response = await fetch(`${API_BASE}/admin/tts-settings`, {
+    credentials: 'include',
+  })
+  if (!response.ok) {
+    throw new Error(`Failed to load TTS settings (${response.status})`)
+  }
+  return (await response.json()) as TtsSettings
+}
+
+export async function patchTtsSettings(input: {
+  provider?: TtsProvider
+  premium_enabled?: boolean
+}): Promise<TtsSettings> {
+  const response = await fetch(`${API_BASE}/admin/tts-settings`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!response.ok) {
+    throw new Error(`Failed to update TTS settings (${response.status})`)
+  }
+  return (await response.json()) as TtsSettings
+}
+
 export async function listAdminBookSources(): Promise<BookSource[]> {
   const response = await fetch(`${API_BASE}/admin/book-sources`, {
     credentials: 'include',

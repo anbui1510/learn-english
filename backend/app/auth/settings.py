@@ -45,6 +45,9 @@ class AuthSettings:
     pa_daily_limit: int
     pa_cost_per_score_usd: float
     use_gemini_empathy: bool
+    elevenlabs_api_key: str
+    elevenlabs_voice_id: str
+    tts_provider_default: str
 
     @property
     def oauth_configured(self) -> bool:
@@ -102,6 +105,11 @@ def get_auth_settings() -> AuthSettings:
         pa_cost_per_score_usd=float(_env("PA_COST_PER_SCORE_USD", "0.0")),
         use_gemini_empathy=_env("USE_GEMINI_EMPATHY", "false").lower()
         in {"1", "true", "yes"},
+        elevenlabs_api_key=_env("ELEVENLABS_API_KEY"),
+        elevenlabs_voice_id=_env(
+            "ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM"
+        ),
+        tts_provider_default=_env("TTS_PROVIDER", "synthetic").lower(),
     )
 
 

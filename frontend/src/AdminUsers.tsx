@@ -3,12 +3,16 @@ import {
   assignRole,
   createBookSource,
   fetchPaUsage,
+  fetchTtsSettings,
   listAdminBookSources,
   listUsers,
+  patchTtsSettings,
   type AdminUser,
   type BookSource,
   type PaUsageRow,
   type Role,
+  type TtsProvider,
+  type TtsSettings,
 } from './api'
 
 const ROLE_OPTIONS: Role[] = ['learner', 'editor', 'admin']
@@ -21,6 +25,7 @@ export function AdminUsers({ onError }: Props) {
   const [users, setUsers] = useState<AdminUser[]>([])
   const [paUsage, setPaUsage] = useState<PaUsageRow[]>([])
   const [bookSources, setBookSources] = useState<BookSource[]>([])
+  const [tts, setTts] = useState<TtsSettings | null>(null)
   const [newSlug, setNewSlug] = useState('')
   const [newTitle, setNewTitle] = useState('')
   const [loading, setLoading] = useState(true)
@@ -30,15 +35,17 @@ export function AdminUsers({ onError }: Props) {
     let cancelled = false
     ;(async () => {
       try {
-        const [rows, usage, sources] = await Promise.all([
+        const [rows, usage, sources, ttsSettings] = await Promise.all([
           listUsers(),
           fetchPaUsage(14),
           listAdminBookSources(),
+          fetchTtsSettings(),
         ])
         if (!cancelled) {
           setUsers(rows)
           setPaUsage(usage)
           setBookSources(sources)
+          setTts(ttsSettings)
           onError(null)
         }
       } catch (err) {
@@ -120,6 +127,67 @@ export function AdminUsers({ onError }: Props) {
           </table>
         </div>
       )}
+
+      <div className="mt-8">
+        <h3 className="text-base font-semibold">TTS provider</h3>
+        <p className="mt-1 text-sm text-slate-500">
+          Org voice engine + premium cost gate (Azure / ElevenLabs need keys in
+          env).
+        </p>
+        {tts ? (
+          <div className="mt-2 flex flex-wrap items-end gap-3 text-sm">
+            <label>
+              Provider
+              <select
+                className="mt-1 block rounded border border-slate-300 px-2 py-1"
+                value={tts.provider}
+                onChange={(e) => {
+                  const provider = e.target.value as TtsProvider
+                  void (async () => {
+                    try {
+                      onError(null)
+                      setTts(await patchTtsSettings({ provider }))
+                    } catch (err) {
+                      onError(
+                        err instanceof Error
+                          ? err.message
+                          : 'Failed to update TTS',
+                      )
+                    }
+                  })()
+                }}
+              >
+                <option value="synthetic">synthetic (CI)</option>
+                <option value="edge">edge-tts</option>
+                <option value="azure">Azure Neural</option>
+                <option value="elevenlabs">ElevenLabs</option>
+              </select>
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={tts.premium_enabled}
+                onChange={(e) => {
+                  const premium_enabled = e.target.checked
+                  void (async () => {
+                    try {
+                      onError(null)
+                      setTts(await patchTtsSettings({ premium_enabled }))
+                    } catch (err) {
+                      onError(
+                        err instanceof Error
+                          ? err.message
+                          : 'Failed to update TTS',
+                      )
+                    }
+                  })()
+                }}
+              />
+              Premium enabled (cost flag)
+            </label>
+          </div>
+        ) : null}
+      </div>
 
       <div className="mt-8">
         <h3 className="text-base font-semibold">Book sources</h3>
