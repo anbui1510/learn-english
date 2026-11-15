@@ -288,6 +288,24 @@ class AzureTtsEngine:
             return self._fallback.synthesize(text=text, speaker=speaker)
 
 
+def resolve_tts_provider_name(
+    *,
+    provider: TtsProvider = "synthetic",
+    premium_enabled: bool = False,
+    use_edge: bool = False,
+) -> TtsProvider:
+    """Effective engine label after premium / USE_EDGE_TTS gates (matches resolve_tts)."""
+    if provider in {"azure", "elevenlabs"} and not premium_enabled:
+        return "edge" if use_edge else "synthetic"
+    if provider == "elevenlabs":
+        return "elevenlabs"
+    if provider == "azure":
+        return "azure"
+    if provider == "edge" or use_edge:
+        return "edge"
+    return "synthetic"
+
+
 def resolve_tts(
     *,
     provider: TtsProvider = "synthetic",
@@ -299,19 +317,19 @@ def resolve_tts(
     elevenlabs_voice_id: str = "21m00Tcm4TlvDq8ikWAM",
 ) -> TtsEngine:
     """Pick TTS engine from org provider + premium cost flag."""
-    if provider in {"azure", "elevenlabs"} and not premium_enabled:
-        # Cost gate: premium providers require org flag.
-        if use_edge:
-            return EdgeTtsEngine()
-        return SyntheticTtsEngine()
-    if provider == "elevenlabs":
+    effective = resolve_tts_provider_name(
+        provider=provider,
+        premium_enabled=premium_enabled,
+        use_edge=use_edge,
+    )
+    if effective == "elevenlabs":
         return ElevenLabsTtsEngine(
             api_key=elevenlabs_api_key,
             voice_id=elevenlabs_voice_id,
         )
-    if provider == "azure":
+    if effective == "azure":
         return AzureTtsEngine(key=azure_speech_key, region=azure_speech_region)
-    if provider == "edge" or use_edge:
+    if effective == "edge":
         return EdgeTtsEngine()
     return SyntheticTtsEngine()
 
@@ -331,4 +349,18 @@ def get_default_tts(*, use_edge: bool = False) -> TtsEngine:
         azure_speech_region=settings.azure_speech_region,
         elevenlabs_api_key=settings.elevenlabs_api_key,
         elevenlabs_voice_id=settings.elevenlabs_voice_id,
+    )
+
+
+def get_effective_tts_provider(*, use_edge: bool = False) -> TtsProvider:
+    """Org-configured provider after the same gates as synthesis."""
+    from app.auth.settings import get_auth_settings
+    from app.org_settings.service import get_tts_org_settings
+
+    settings = get_auth_settings()
+    org = get_tts_org_settings()
+    return resolve_tts_provider_name(
+        provider=org.provider,  # type: ignore[arg-type]
+        premium_enabled=org.premium_enabled,
+        use_edge=use_edge or settings.use_edge_tts,
     )

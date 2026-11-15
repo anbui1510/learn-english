@@ -3,8 +3,30 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from app.auth.settings import AuthSettings
+from app.speech.tts import resolve_tts_provider_name
 from tests.conftest import seed_admin_editor_learner, set_session_cookie
 from tests.test_learner_stack import _published_with_dialogue
+
+
+def test_resolve_tts_provider_name_respects_premium_gate() -> None:
+    assert (
+        resolve_tts_provider_name(
+            provider="azure", premium_enabled=False, use_edge=False
+        )
+        == "synthetic"
+    )
+    assert (
+        resolve_tts_provider_name(
+            provider="elevenlabs", premium_enabled=False, use_edge=True
+        )
+        == "edge"
+    )
+    assert (
+        resolve_tts_provider_name(
+            provider="azure", premium_enabled=True, use_edge=False
+        )
+        == "azure"
+    )
 
 
 def test_lesson_includes_tts_provider(
