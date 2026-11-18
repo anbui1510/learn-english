@@ -1,0 +1,50 @@
+{
+  "context": "colleague_sbar",
+  "cefr_level": "C1",
+  "status": "accepted",
+  "lines": [
+    {
+      "speaker": "Dr. Vance",
+      "text": "Good morning. I am calling to hand over our new admission, an infant under 12 months presenting with typical viral bronchiolitis.",
+      "text_vi": "Ch\u00e0o bu\u1ed5i s\u00e1ng. T\u00f4i g\u1ecdi \u0111\u1ec3 b\u00e0n giao b\u1ec7nh nh\u00e2n m\u1edbi nh\u1eadp vi\u1ec7n, m\u1ed9t tr\u1ebb nh\u0169 nhi d\u01b0\u1edbi 12 th\u00e1ng tu\u1ed5i tr\u00ecnh b\u00e0y b\u1ec7nh vi\u00eam ti\u1ec3u ph\u1ebf qu\u1ea3n do virus \u0111i\u1ec3n h\u00ecnh.",
+      "source_quote": "Typical age at presentation is under 12 months",
+      "page": 1,
+      "is_key_phrase": true
+    },
+    {
+      "speaker": "Dr. Sterling",
+      "text": "Thank you for the situation update. What is the background regarding the clinical presentation and duration?",
+      "text_vi": "C\u1ea3m \u01a1n b\u1ea1n \u0111\u00e3 c\u1eadp nh\u1eadt t\u00ecnh h\u00ecnh. B\u1ed1i c\u1ea3nh v\u1ec1 bi\u1ec3u hi\u1ec7n l\u00e2m s\u00e0ng v\u00e0 th\u1eddi gian k\u00e9o d\u00e0i nh\u01b0 th\u1ebf n\u00e0o?",
+      "page": 1,
+      "is_key_phrase": false
+    },
+    {
+      "speaker": "Dr. Vance",
+      "text": "Caregivers reported a few days of coryza followed by cough, fast breathing, and feeding difficulty.",
+      "text_vi": "Ng\u01b0\u1eddi ch\u0103m s\u00f3c b\u00e1o c\u00e1o c\u00f3 v\u00e0i ng\u00e0y ch\u1ea3y n\u01b0\u1edbc m\u0169i sau \u0111\u00f3 ho, th\u1edf nhanh v\u00e0 kh\u00f3 b\u00fa.",
+      "page": 1,
+      "is_key_phrase": true
+    },
+    {
+      "speaker": "Dr. Sterling",
+      "text": "Understood. And what did your assessment reveal upon examination?",
+      "text_vi": "\u0110\u00e3 hi\u1ec3u. V\u00e0 \u0111\u00e1nh gi\u00e1 c\u1ee7a b\u1ea1n cho th\u1ea5y g\u00ec khi kh\u00e1m?",
+      "page": 1,
+      "is_key_phrase": false
+    },
+    {
+      "speaker": "Dr. Vance",
+      "text": "Examination showed tachypnea, chest wall recession, widespread crackles, and an expiratory wheeze. Pulse oximetry indicates the need for oxygen therapy due to persistent hypoxemia.",
+      "text_vi": "Kh\u00e1m ghi nh\u1eadn th\u1edf nhanh, l\u00f5m ng\u1ef1c, ran \u1ea9m lan t\u1ecfa v\u00e0 kh\u00f2 kh\u00e8 th\u1edf ra. \u0110o \u0111\u1ed9 b\u00e3o h\u00f2a oxy ch\u1ec9 \u0111\u1ecbnh c\u1ea7n li\u1ec7u ph\u00e1p oxy do gi\u1ea3m oxy m\u00e1u k\u00e9o d\u00e0i.",
+      "page": 1,
+      "is_key_phrase": true
+    },
+    {
+      "speaker": "Dr. Sterling",
+      "text": "I concur with the admission given the inadequate feeding and hypoxemia. I recommend supportive care including hydration, nasal saline and suctioning, and monitoring work of breathing.",
+      "text_vi": "T\u00f4i \u0111\u1ed3ng \u00fd cho nh\u1eadp vi\u1ec7n do b\u00fa k\u00e9m v\u00e0 gi\u1ea3m oxy m\u00e1u. T\u00f4i \u0111\u1ec1 xu\u1ea5t ch\u0103m s\u00f3c h\u1ed7 tr\u1ee3 bao g\u1ed3m b\u00f9 d\u1ecbch, nh\u1ecf n\u01b0\u1edbc mu\u1ed1i sinh l\u00fd v\u00e0 h\u00fat m\u0169i, c\u00f9ng theo d\u00f5i c\u00f4ng h\u00f4 h\u1ea5p.",
+      "page": 1,
+      "is_key_phrase": true
+    }
+  ]
+}

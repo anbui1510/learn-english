@@ -1,0 +1,47 @@
+{
+  "context": "expert_cme",
+  "cefr_level": "B1",
+  "status": "accepted",
+  "lines": [
+    {
+      "speaker": "expert",
+      "text": "Bronchiolitis is a common lower respiratory tract infection in infants, most often caused by respiratory syncytial virus.",
+      "text_vi": "Vi\u00eam ti\u1ec3u ph\u1ebf qu\u1ea3n l\u00e0 m\u1ed9t nhi\u1ec5m tr\u00f9ng \u0111\u01b0\u1eddng h\u00f4 h\u1ea5p d\u01b0\u1edbi ph\u1ed5 bi\u1ebfn \u1edf nh\u0169 nhi.",
+      "source_quote": "Bronchiolitis is a common lower respiratory tract infection in infants",
+      "page": 1,
+      "is_key_phrase": true
+    },
+    {
+      "speaker": "learner",
+      "text": "What are the typical symptoms caregivers usually report during the presentation?",
+      "text_vi": "C\u00e1c tri\u1ec7u ch\u1ee9ng \u0111i\u1ec3n h\u00ecnh m\u00e0 ng\u01b0\u1eddi ch\u0103m s\u00f3c th\u01b0\u1eddng b\u00e1o c\u00e1o l\u00e0 g\u00ec?",
+      "source_quote": "Caregivers usually report a few days of coryza followed by cough, fast breathing, and feeding difficulty",
+      "page": 1,
+      "is_key_phrase": false
+    },
+    {
+      "speaker": "expert",
+      "text": "Caregivers usually report a few days of coryza followed by cough, fast breathing, and feeding difficulty.",
+      "text_vi": "Ng\u01b0\u1eddi ch\u0103m s\u00f3c th\u01b0\u1eddng b\u00e1o c\u00e1o v\u00e0i ng\u00e0y ch\u1ea3y m\u0169i sau \u0111\u00f3 ho, th\u1edf nhanh v\u00e0 kh\u00f3 b\u00fa.",
+      "source_quote": "Caregivers usually report a few days of coryza followed by cough, fast breathing, and feeding difficulty",
+      "page": 1,
+      "is_key_phrase": true
+    },
+    {
+      "speaker": "learner",
+      "text": "Is chest radiography required to confirm the diagnosis in uncomplicated cases?",
+      "text_vi": "C\u00f3 c\u1ea7n ch\u1ee5p X-quang ng\u1ef1c \u0111\u1ec3 x\u00e1c \u0111\u1ecbnh ch\u1ea9n \u0111o\u00e1n trong c\u00e1c ca kh\u00f4ng bi\u1ebfn ch\u1ee9ng kh\u00f4ng?",
+      "source_quote": "Diagnosis is clinical; routine chest radiography and laboratory tests are not required for uncomplicated cases",
+      "page": 1,
+      "is_key_phrase": false
+    },
+    {
+      "speaker": "expert",
+      "text": "No, diagnosis is clinical, and routine chest radiography and laboratory tests are not required for uncomplicated cases.",
+      "text_vi": "Kh\u00f4ng, ch\u1ea9n \u0111o\u00e1n d\u1ef1a tr\u00ean l\u00e2m s\u00e0ng v\u00e0 kh\u00f4ng c\u1ea7n ch\u1ee5p X-quang ng\u1ef1c th\u01b0\u1eddng quy.",
+      "source_quote": "Diagnosis is clinical; routine chest radiography and laboratory tests are not required for uncomplicated cases",
+      "page": 1,
+      "is_key_phrase": true
+    }
+  ]
+}

@@ -21,7 +21,7 @@ _SPEAKERS: dict[str, tuple[str, str]] = {
 
 _LINE_COUNTS = {"A2": 4, "B1": 5, "C1": 6}
 
-_DEFAULT_GEMINI_MODEL = "gemini-2.0-flash"
+_DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite"
 _MAX_SOURCE_CHARS = 120_000
 _SCHEMA_FILE = repo_root() / "schemas" / "studio-dialogue.schema.json"
 
@@ -235,6 +235,8 @@ def _generate_and_validate(
             _touch_review(case_dir, stem)
             return out_path
         except (ValidationError, ValueError, json.JSONDecodeError, TypeError) as exc:
+            last_error = str(exc)
+        except Exception as exc:  # Gemini/API errors (404, 503, …)
             last_error = str(exc)
 
     _write_generate_error(dialogues_dir, stem, last_error)

@@ -1,0 +1,47 @@
+{
+  "patient_family__A2": {
+    "status": "accepted",
+    "notes": "",
+    "reviewed_at": "2026-11-18T18:31:32Z"
+  },
+  "patient_family__B1": {
+    "status": "accepted",
+    "notes": "",
+    "reviewed_at": "2026-11-18T18:31:32Z"
+  },
+  "patient_family__C1": {
+    "status": "accepted",
+    "notes": "",
+    "reviewed_at": "2026-11-18T18:31:33Z"
+  },
+  "colleague_sbar__A2": {
+    "status": "accepted",
+    "notes": "",
+    "reviewed_at": "2026-11-18T18:31:33Z"
+  },
+  "colleague_sbar__B1": {
+    "status": "accepted",
+    "notes": "",
+    "reviewed_at": "2026-11-18T18:31:33Z"
+  },
+  "colleague_sbar__C1": {
+    "status": "accepted",
+    "notes": "",
+    "reviewed_at": "2026-11-18T18:31:33Z"
+  },
+  "expert_cme__A2": {
+    "status": "accepted",
+    "notes": "",
+    "reviewed_at": "2026-11-18T18:31:34Z"
+  },
+  "expert_cme__C1": {
+    "status": "accepted",
+    "notes": "",
+    "reviewed_at": "2026-11-18T18:31:34Z"
+  },
+  "expert_cme__B1": {
+    "status": "accepted",
+    "notes": "",
+    "reviewed_at": "2026-11-18T18:31:34Z"
+  }
+}

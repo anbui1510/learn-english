@@ -1,0 +1,57 @@
+{
+  "context": "expert_cme",
+  "cefr_level": "C1",
+  "status": "accepted",
+  "lines": [
+    {
+      "speaker": "Expert",
+      "text": "Welcome to our clinical seminar. Today we discuss bronchiolitis, which is a common lower respiratory tract infection in infants, most often caused by respiratory syncytial virus.",
+      "text_vi": "Ch\u00e0o m\u1eebng \u0111\u1ebfn v\u1edbi bu\u1ed5i h\u1ed9i th\u1ea3o l\u00e2m s\u00e0ng c\u1ee7a ch\u00fang t\u00f4i.",
+      "source_quote": "Bronchiolitis is a common lower respiratory tract infection in infants, most often caused by respiratory syncytial virus",
+      "page": 1,
+      "is_key_phrase": true
+    },
+    {
+      "speaker": "Learner",
+      "text": "Thank you. What is the typical age of presentation, and how does the clinical picture usually unfold?",
+      "text_vi": "C\u1ea3m \u01a1n chuy\u00ean gia. \u0110\u1ed9 tu\u1ed5i \u0111i\u1ec3n h\u00ecnh khi bi\u1ec3u hi\u1ec7n b\u1ec7nh l\u00e0 g\u00ec?",
+      "page": 1
+    },
+    {
+      "speaker": "Expert",
+      "text": "The typical age at presentation is under 12 months, with peak severity between 1 and 3 months of age. Caregivers usually report coryza followed by cough, fast breathing, and feeding difficulty.",
+      "text_vi": "\u0110\u1ed9 tu\u1ed5i \u0111i\u1ec3n h\u00ecnh khi bi\u1ec3u hi\u1ec7n l\u00e0 d\u01b0\u1edbi 12 th\u00e1ng tu\u1ed5i.",
+      "source_quote": "Typical age at presentation is under 12 months, with peak severity between 1 and 3 months of age",
+      "page": 1,
+      "is_key_phrase": true
+    },
+    {
+      "speaker": "Learner",
+      "text": "And regarding diagnostics, is routine chest radiography warranted for uncomplicated presentations?",
+      "text_vi": "V\u00e0 v\u1ec1 m\u1eb7t ch\u1ea9n \u0111o\u00e1n, c\u00f3 c\u1ea7n ch\u1ee5p X-quang ng\u1ef1c th\u01b0\u1eddng quy kh\u00f4ng?",
+      "page": 1
+    },
+    {
+      "speaker": "Expert",
+      "text": "Diagnosis is clinical; routine chest radiography and laboratory tests are not required for uncomplicated cases. Pulse oximetry helps guide oxygen therapy.",
+      "text_vi": "Ch\u1ea9n \u0111o\u00e1n d\u1ef1a tr\u00ean l\u00e2m s\u00e0ng; ch\u1ee5p X-quang ng\u1ef1c th\u01b0\u1eddng quy l\u00e0 kh\u00f4ng b\u1eaft bu\u1ed9c.",
+      "source_quote": "Diagnosis is clinical; routine chest radiography and laboratory tests are not required for uncomplicated cases",
+      "page": 1,
+      "is_key_phrase": true
+    },
+    {
+      "speaker": "Learner",
+      "text": "Understood. Should we routinely prescribe bronchodilators or corticosteroids for viral bronchiolitis?",
+      "text_vi": "\u0110\u00e3 r\u00f5. Ch\u00fang ta c\u00f3 n\u00ean th\u01b0\u1eddng xuy\u00ean k\u00ea \u0111\u01a1n thu\u1ed1c gi\u00e3n ph\u1ebf qu\u1ea3n kh\u00f4ng?",
+      "page": 1
+    },
+    {
+      "speaker": "Expert",
+      "text": "No, bronchodilators, corticosteroids, and antibiotics do not routinely improve outcomes in typical viral bronchiolitis. Supportive care remains the mainstay of management.",
+      "text_vi": "Kh\u00f4ng, thu\u1ed1c gi\u00e3n ph\u1ebf qu\u1ea3n, corticosteroid v\u00e0 kh\u00e1ng sinh kh\u00f4ng c\u1ea3i thi\u1ec7n k\u1ebft qu\u1ea3.",
+      "source_quote": "Bronchodilators, corticosteroids, and antibiotics do not routinely improve outcomes in typical viral bronchiolitis",
+      "page": 1,
+      "is_key_phrase": true
+    }
+  ]
+}

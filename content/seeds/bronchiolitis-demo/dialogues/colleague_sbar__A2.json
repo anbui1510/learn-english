@@ -1,0 +1,36 @@
+{
+  "context": "colleague_sbar",
+  "cefr_level": "A2",
+  "status": "accepted",
+  "lines": [
+    {
+      "speaker": "Doctor A",
+      "text": "Bronchiolitis is a common lower respiratory tract infection in infants, most often caused by respiratory syncytial virus.",
+      "text_vi": "Vi\u00eam ti\u1ec3u ph\u1ebf qu\u1ea3n l\u00e0 m\u1ed9t nhi\u1ec5m tr\u00f9ng \u0111\u01b0\u1eddng h\u00f4 h\u1ea5p d\u01b0\u1edbi ph\u1ed5 bi\u1ebfn \u1edf tr\u1ebb s\u01a1 sinh.",
+      "source_quote": "Bronchiolitis is a common lower respiratory tract infection in infants",
+      "page": 1,
+      "is_key_phrase": true
+    },
+    {
+      "speaker": "Doctor B",
+      "text": "The patient is an infant under 12 months with cough, fast breathing, and feeding difficulty.",
+      "text_vi": "B\u1ec7nh nh\u00e2n l\u00e0 tr\u1ebb d\u01b0\u1edbi 12 th\u00e1ng tu\u1ed5i c\u00f3 ho, th\u1edf nhanh v\u00e0 kh\u00f3 b\u00fa.",
+      "page": 1,
+      "is_key_phrase": false
+    },
+    {
+      "speaker": "Doctor A",
+      "text": "Clinical examination shows tachypnea, chest wall recession, and expiratory wheeze.",
+      "text_vi": "Kh\u00e1m l\u00e2m s\u00e0ng cho th\u1ea5y th\u1edf nhanh, r\u00fat l\u00f5m l\u1ed3ng ng\u1ef1c v\u00e0 kh\u00f2 kh\u00e8 th\u00ec th\u1edf ra.",
+      "page": 1,
+      "is_key_phrase": false
+    },
+    {
+      "speaker": "Doctor B",
+      "text": "Supportive care is the mainstay, and pulse oximetry helps guide oxygen therapy.",
+      "text_vi": "Ch\u0103m s\u00f3c h\u1ed7 tr\u1ee3 l\u00e0 ch\u00ednh, v\u00e0 \u0111o \u0111\u1ed9 b\u00e3o h\u00f2a oxy gi\u00fap h\u01b0\u1edbng d\u1eabn li\u1ec7u ph\u00e1p oxy.",
+      "page": 1,
+      "is_key_phrase": true
+    }
+  ]
+}
