@@ -119,29 +119,45 @@ function SpeakerPanel({
     <div
       style={{
         flex: 1,
-        borderRadius: 24,
+        borderRadius: 28,
         border: `3px solid ${isActive ? BORDER_ACTIVE : BORDER_IDLE}`,
         backgroundColor: isActive ? PANEL_ACTIVE : PANEL_IDLE,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        opacity: isActive ? 1 : 0.55,
-        padding: 24,
+        opacity: isActive ? 1 : 0.62,
+        transform: isActive ? 'scale(1.02)' : 'scale(1)',
+        padding: 28,
+        boxShadow: isActive
+          ? '0 0 0 1px rgba(94,234,212,0.35), 0 24px 60px rgba(0,0,0,0.35)'
+          : 'none',
       }}
     >
       <Img
         src={staticFile(speaker.avatarUrl)}
         style={{
-          width: 220,
-          height: 220,
+          width: 280,
+          height: 280,
           borderRadius: '50%',
           objectFit: 'cover',
-          marginBottom: 24,
-          border: `4px solid ${isActive ? BORDER_ACTIVE : BORDER_IDLE}`,
+          marginBottom: 28,
+          border: `5px solid ${isActive ? BORDER_ACTIVE : BORDER_IDLE}`,
         }}
       />
-      <div style={{ fontSize: 36, fontWeight: 700 }}>{speaker.label}</div>
+      <div style={{ fontSize: 40, fontWeight: 700, letterSpacing: '-0.02em' }}>
+        {speaker.label}
+      </div>
+      <div
+        style={{
+          marginTop: 10,
+          fontSize: 22,
+          color: isActive ? '#99f6e4' : '#94a3b8',
+          fontWeight: 600,
+        }}
+      >
+        {isActive ? 'Speaking' : 'Listening'}
+      </div>
     </div>
   )
 }
@@ -176,9 +192,31 @@ export const DualTalkComposition: React.FC<DualTalkCompositionProps> = ({
         fontFamily: 'Georgia, serif',
       }}
     >
-      {fullAudioPath ? <Audio src={fullAudioPath} /> : null}
+      {fullAudioPath ? (
+        <Audio
+          src={
+            fullAudioPath.startsWith('http://') ||
+            fullAudioPath.startsWith('https://')
+              ? fullAudioPath
+              : staticFile(
+                  fullAudioPath.startsWith('/')
+                    ? fullAudioPath.slice(1)
+                    : fullAudioPath,
+                )
+          }
+        />
+      ) : null}
 
-      <AbsoluteFill style={{ flexDirection: 'row', padding: 48, gap: 32 }}>
+      <AbsoluteFill
+        style={{
+          display: 'flex',
+          flexDirection: 'row',
+          padding: '48px 48px 280px',
+          gap: 32,
+          background:
+            'radial-gradient(1200px 700px at 20% 0%, #123047 0%, #020617 55%)',
+        }}
+      >
         {left ? (
           <SpeakerPanel speaker={left} isActive={left.id === activeSpeaker} />
         ) : null}

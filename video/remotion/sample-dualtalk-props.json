@@ -8,13 +8,13 @@
     {
       "id": "doctor",
       "label": "Doctor",
-      "avatarUrl": "avatars/male.png",
+      "avatarUrl": "avatars/doctor.jpg",
       "side": "left"
     },
     {
       "id": "parent",
       "label": "Parent",
-      "avatarUrl": "avatars/female.png",
+      "avatarUrl": "avatars/parent.jpg",
       "side": "right"
     }
   ],
