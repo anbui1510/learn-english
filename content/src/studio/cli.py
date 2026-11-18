@@ -8,6 +8,7 @@ import typer
 from studio.generate import generate_dialogues
 from studio.ingest import ingest_case
 from studio.review import accept_dialogue, list_reviews, reject_dialogue
+from studio.render import render_case
 from studio.synthesize import synthesize_case
 
 app = typer.Typer(help="Learn English content studio CLI.")
@@ -111,6 +112,22 @@ def synthesize(
         force=force,
         engine=engine,  # type: ignore[arg-type]
     )
+    for path in paths:
+        typer.echo(str(path))
+
+
+@app.command()
+def render(
+    case: str = typer.Option(..., "--case", help="Case id."),
+    dialogue: Optional[str] = typer.Option(
+        None, "--dialogue", help="Dialogue stem; omit to render all accepted."
+    ),
+    force: bool = typer.Option(
+        False, "--force", help="Render even if dialogue is not accepted."
+    ),
+) -> None:
+    """Render DualTalk MP4 (Remotion with ffmpeg fallback)."""
+    paths = render_case(case, dialogue, force=force)
     for path in paths:
         typer.echo(str(path))
 
