@@ -1,0 +1,47 @@
+{
+  "context": "patient_family",
+  "cefr_level": "B1",
+  "status": "accepted",
+  "lines": [
+    {
+      "speaker": "Doctor",
+      "text": "Hello, I know you are worried about your baby. Bronchiolitis is a common lower respiratory tract infection in infants, which just means an infection in the small airways of the lungs.",
+      "text_vi": "Vi\u00eam ti\u1ec3u ph\u1ebf qu\u1ea3n l\u00e0 m\u1ed9t nhi\u1ec5m tr\u00f9ng \u0111\u01b0\u1eddng h\u00f4 h\u1ea5p d\u01b0\u1edbi ph\u1ed5 bi\u1ebfn \u1edf tr\u1ebb s\u01a1 sinh.",
+      "source_quote": "Bronchiolitis is a common lower respiratory tract infection in infants",
+      "page": 1,
+      "is_key_phrase": true
+    },
+    {
+      "speaker": "Parent",
+      "text": "Yes, she has been coughing, breathing fast, and having a hard time feeding for a few days now after a runny nose.",
+      "text_vi": "V\u00e2ng, con b\u00e9 \u0111\u00e3 ho, th\u1edf nhanh v\u00e0 kh\u00f3 b\u00fa v\u00e0i ng\u00e0y nay sau khi b\u1ecb s\u1ed5 m\u0169i.",
+      "source_quote": "Caregivers usually report a few days of coryza followed by cough, fast breathing, and feeding difficulty.",
+      "page": 1,
+      "is_key_phrase": false
+    },
+    {
+      "speaker": "Doctor",
+      "text": "That is very typical for this condition. We use supportive care as the main treatment, which includes keeping her hydrated, using nasal saline drops with gentle suctioning, and watching her breathing.",
+      "text_vi": "Ch\u0103m s\u00f3c n\u00e2ng \u0111\u1ee1 l\u00e0 ph\u01b0\u01a1ng ph\u00e1p ch\u00ednh: b\u00f9 n\u01b0\u1edbc, nh\u1ecf n\u01b0\u1edbc mu\u1ed1i sinh l\u00fd v\u00e0 h\u00fat m\u0169i, theo d\u00f5i c\u00f4ng th\u1edf.",
+      "source_quote": "Supportive care is the mainstay: hydration, nasal saline and suctioning, and monitoring work of breathing.",
+      "page": 1,
+      "is_key_phrase": true
+    },
+    {
+      "speaker": "Parent",
+      "text": "Do we need any special medicines or an X-ray?",
+      "text_vi": "Li\u1ec7u ch\u00fang t\u00f4i c\u00f3 c\u1ea7n thu\u1ed1c \u0111\u1eb7c bi\u1ec7t hay ch\u1ee5p X-quang kh\u00f4ng?",
+      "source_quote": "Diagnosis is clinical; routine chest radiography and laboratory tests are not required for uncomplicated cases.",
+      "page": 1,
+      "is_key_phrase": false
+    },
+    {
+      "speaker": "Doctor",
+      "text": "No, antibiotics and regular chest medicines do not routinely help with this type of viral infection. The illness usually lasts for several days, but please watch for worsening distress and come back immediately if she has trouble breathing or cannot feed.",
+      "text_vi": "B\u1ed1 m\u1eb9 n\u00ean \u0111\u01b0\u1ee3c t\u01b0 v\u1ea5n v\u1ec1 di\u1ec5n bi\u1ebfn b\u1ec7nh k\u00e9o d\u00e0i v\u00e0i ng\u00e0y v\u00e0 khi n\u00e0o c\u1ea7n \u0111i kh\u00e1m g\u1ea5p n\u1ebfu b\u00e9 m\u1ec7t h\u01a1n.",
+      "source_quote": "Parents should be advised about expected illness course of several days and when to seek urgent review for worsening distress.",
+      "page": 1,
+      "is_key_phrase": true
+    }
+  ]
+}

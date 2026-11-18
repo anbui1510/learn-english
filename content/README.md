@@ -2,6 +2,8 @@
 
 Typer CLI for ingesting medical cases, generating CEFR dialogues, review, TTS, and DualTalk render. Case data lives under `data/cases/`; a SQLite manifest mirrors filesystem state at `data/studio.sqlite`.
 
+Live Gemini generation uses model `gemini-3.5-flash-lite` by default (override with `STUDIO_GEMINI_MODEL` when needed). Set `GEMINI_API_KEY` in the environment.
+
 ## Setup
 
 ```bash

@@ -1,0 +1,3 @@
+# bronchiolitis-demo (Gemini seed)
+
+Nine CEFR dialogues for infant bronchiolitis were generated with live **Gemini** (`gemini-3.5-flash-lite`) from the bundled `source.txt`, then accepted for review. This folder is the committed snapshot of case metadata, review state, and dialogue JSON only. Audio and video are not checked in; reproduce them locally with `uv run studio synthesize --case bronchiolitis-demo --engine auto` and `uv run studio render --case bronchiolitis-demo` after ingesting or copying artifacts into gitignored `data/cases/bronchiolitis-demo/`.
