@@ -225,22 +225,37 @@ def _synthesize_stem(
     audio_dir = case_dir / "audio" / stem
     audio_dir.mkdir(parents=True, exist_ok=True)
 
-    line_entries: list[dict[str, object]] = []
-    audio_chunks: list[bytes] = []
-    engines_used: set[str] = set()
-    use_mp3 = False
-    timeline_ms = 0
-
+    pending: list[tuple[int, str, str]] = []
     for index, line in enumerate(lines):
         text = str(line.get("text") or "").strip()
         speaker = str(line.get("speaker") or "doctor")
         if not text:
             continue
-        result = tts.synthesize(text=text, speaker=speaker)
-        engines_used.add(result.engine)
-        if "mpeg" in result.content_type:
-            use_mp3 = True
+        pending.append((index, text, speaker))
 
+    synth_results: list[tuple[int, str, str, SynthResult]] = []
+    for index, text, speaker in pending:
+        result = tts.synthesize(text=text, speaker=speaker)
+        synth_results.append((index, text, speaker, result))
+
+    engines_used = {r.engine for *_, r in synth_results}
+    has_mp3 = any("mpeg" in r.content_type for *_, r in synth_results)
+    has_wav = any("mpeg" not in r.content_type for *_, r in synth_results)
+    mixed_containers = has_mp3 and has_wav
+
+    if mixed_containers:
+        uniform = SyntheticTtsEngine()
+        synth_results = [
+            (index, text, speaker, uniform.synthesize(text=text, speaker=speaker))
+            for index, text, speaker in pending
+        ]
+        engines_used = {"synthetic"}
+
+    line_entries: list[dict[str, object]] = []
+    audio_chunks: list[bytes] = []
+    timeline_ms = 0
+
+    for index, text, speaker, result in synth_results:
         ext = "mp3" if "mpeg" in result.content_type else "wav"
         filename = f"line_{index + 1:03d}.{ext}"
         line_path = audio_dir / filename
@@ -275,7 +290,10 @@ def _synthesize_stem(
     else:
         effective_engine = "synthetic"
 
-    if use_mp3:
+    all_mp3 = bool(synth_results) and all(
+        "mpeg" in r.content_type for *_, r in synth_results
+    )
+    if all_mp3:
         full_bytes = _concat_mp3(audio_chunks)
         full_name = "full.mp3"
     else:
