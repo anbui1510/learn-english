@@ -4,7 +4,8 @@
   "version": "0.1.0",
   "scripts": {
     "studio": "remotion studio src/index.ts",
-    "render": "remotion render src/index.ts Karaoke out/karaoke.mp4"
+    "render": "remotion render src/index.ts Karaoke out/karaoke.mp4",
+    "render:dualtalk": "remotion render src/index.ts DualTalk out/dualtalk.mp4 --props=./sample-dualtalk-props.json"
   },
   "dependencies": {
     "@remotion/cli": "^4.0.0",

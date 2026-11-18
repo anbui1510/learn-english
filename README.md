@@ -9,6 +9,11 @@ Medical English practice platform for residents (MVP stack from `docs/brief.md` 
 | `backend/` | FastAPI API (`/health`, Google OAuth, roles) |
 | `frontend/` | Vite + React + TypeScript + Tailwind |
 | `schemas/` | Shared JSON Schema (story 1.2+) |
+| `content/` | Content Studio CLI — ingest, generate, synthesize, render (Phase 1) |
+
+## Content Studio (Phase 1)
+
+Operator CLI and fixture pipeline live under [`content/`](content/README.md): `uv run studio` with file-first cases and a SQLite manifest. Learner `backend/` and `frontend/` are unchanged.
 
 ## Prerequisites
 

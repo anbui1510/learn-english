@@ -1,0 +1,50 @@
+{
+  "title": "Bronchiolitis teaching",
+  "isbn": "978-0-000",
+  "edition": "1",
+  "fps": 30,
+  "durationMs": 8000,
+  "speakers": [
+    {
+      "id": "doctor",
+      "label": "Doctor",
+      "avatarUrl": "avatars/male.png",
+      "side": "left"
+    },
+    {
+      "id": "parent",
+      "label": "Parent",
+      "avatarUrl": "avatars/female.png",
+      "side": "right"
+    }
+  ],
+  "lines": [
+    {
+      "speaker": "doctor",
+      "text": "Supportive care is first-line for bronchiolitis.",
+      "offsetMs": 0,
+      "durationMs": 3500,
+      "words": [
+        { "word": "Supportive", "offsetMs": 0, "durationMs": 500 },
+        { "word": "care", "offsetMs": 500, "durationMs": 400 },
+        { "word": "is", "offsetMs": 900, "durationMs": 200 },
+        { "word": "first-line", "offsetMs": 1100, "durationMs": 600 },
+        { "word": "for", "offsetMs": 1700, "durationMs": 250 },
+        { "word": "bronchiolitis.", "offsetMs": 1950, "durationMs": 800 }
+      ]
+    },
+    {
+      "speaker": "parent",
+      "text": "Hydration and oxygen when needed.",
+      "offsetMs": 3500,
+      "durationMs": 3200,
+      "words": [
+        { "word": "Hydration", "offsetMs": 0, "durationMs": 600 },
+        { "word": "and", "offsetMs": 600, "durationMs": 200 },
+        { "word": "oxygen", "offsetMs": 800, "durationMs": 500 },
+        { "word": "when", "offsetMs": 1300, "durationMs": 350 },
+        { "word": "needed.", "offsetMs": 1650, "durationMs": 600 }
+      ]
+    }
+  ]
+}

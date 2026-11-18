@@ -12,6 +12,10 @@ frontend/.env
 # Local SQLite + object storage (MVP stand-ins)
 backend/data/
 
+# Content Studio runtime artifacts
+content/data/
+content/.venv/
+
 # Python
 .venv/
 __pycache__/

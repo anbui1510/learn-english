@@ -43,3 +43,20 @@ jobs:
         run: |
           npm ci
           npm run build
+
+  content:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: content
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Content studio tests
+        run: |
+          uv sync
+          uv run pytest -q

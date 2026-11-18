@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://learn-english.local/schemas/studio-dialogue.schema.json",
+  "title": "StudioDialogueArtifact",
+  "description": "Phase 1 studio dialogue for content pipeline review (fact_ids optional).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["context", "cefr_level", "status", "lines"],
+  "properties": {
+    "context": {
+      "type": "string",
+      "enum": ["patient_family", "colleague_sbar", "expert_cme"]
+    },
+    "cefr_level": {
+      "type": "string",
+      "enum": ["A2", "B1", "C1"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "needs_review", "accepted", "rejected"]
+    },
+    "lines": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/studioDialogueLine"
+      }
+    }
+  },
+  "definitions": {
+    "studioDialogueLine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["speaker", "text"],
+      "properties": {
+        "speaker": {
+          "type": "string",
+          "minLength": 1
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "description": "English dialogue line (primary language)."
+        },
+        "text_vi": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional Vietnamese gloss."
+        },
+        "source_quote": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Short quote grounded in source.txt."
+        },
+        "page": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "fact_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Optional links to clinical fact card ids (may be omitted in studio)."
+        },
+        "is_key_phrase": {
+          "type": "boolean",
+          "description": "When true, line is a candidate for shadowing cards."
+        }
+      }
+    }
+  }
+}
