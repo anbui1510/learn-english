@@ -8,7 +8,9 @@ import typer
 from studio.generate import generate_dialogues
 from studio.ingest import ingest_case
 from studio.review import accept_dialogue, list_reviews, reject_dialogue
+from studio.manifest import rebuild_index
 from studio.render import render_case
+from studio.status import case_status
 from studio.synthesize import synthesize_case
 
 app = typer.Typer(help="Learn English content studio CLI.")
@@ -130,6 +132,21 @@ def render(
     paths = render_case(case, dialogue, force=force)
     for path in paths:
         typer.echo(str(path))
+
+
+@app.command()
+def index() -> None:
+    """Rebuild SQLite manifest from case folders."""
+    n = rebuild_index()
+    typer.echo(f"indexed {n} row(s)")
+
+
+@app.command()
+def status(
+    case: str = typer.Option(..., "--case", help="Case id."),
+) -> None:
+    """Print pipeline summary for a case."""
+    typer.echo(case_status(case), nl=False)
 
 
 @review_app.command("reject")
