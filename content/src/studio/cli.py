@@ -8,6 +8,7 @@ import typer
 from studio.generate import generate_dialogues
 from studio.ingest import ingest_case
 from studio.review import accept_dialogue, list_reviews, reject_dialogue
+from studio.synthesize import synthesize_case
 
 app = typer.Typer(help="Learn English content studio CLI.")
 review_app = typer.Typer(help="Review generated dialogues.")
@@ -86,6 +87,32 @@ def review_accept(
     """Mark a dialogue accepted."""
     accept_dialogue(case, dialogue)
     typer.echo(f"accepted {dialogue}")
+
+
+@app.command()
+def synthesize(
+    case: str = typer.Option(..., "--case", help="Case id."),
+    dialogue: Optional[str] = typer.Option(
+        None, "--dialogue", help="Dialogue stem; omit to synthesize all accepted."
+    ),
+    force: bool = typer.Option(
+        False, "--force", help="Synthesize even if dialogue is not accepted."
+    ),
+    engine: str = typer.Option(
+        "auto",
+        "--engine",
+        help="TTS engine: auto, synthetic (CI), or edge.",
+    ),
+) -> None:
+    """Synthesize dual-voice audio and word timestamps for dialogues."""
+    paths = synthesize_case(
+        case,
+        dialogue,
+        force=force,
+        engine=engine,  # type: ignore[arg-type]
+    )
+    for path in paths:
+        typer.echo(str(path))
 
 
 @review_app.command("reject")
