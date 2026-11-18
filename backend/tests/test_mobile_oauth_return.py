@@ -92,10 +92,25 @@ def test_callback_rejects_unallowlisted_return_to_uses_frontend_origin(
     assert response.headers["location"] == auth_settings.frontend_origin
 
 
+def test_custom_scheme_login_requires_pkce_challenge(
+    client: TestClient,
+    auth_settings: AuthSettings,
+) -> None:
+    assert ensure_google_client(auth_settings)
+    response = client.get(
+        "/auth/google/login",
+        params={"return_to": "com.learnenglish.app://auth/callback"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 400
+
+
 def test_custom_scheme_return_issues_code_and_exchange_sets_cookie(
     client: TestClient,
     auth_settings: AuthSettings,
 ) -> None:
+    from app.auth.mobile_return import pkce_challenge_s256
+
     clear_auth_codes()
     assert ensure_google_client(auth_settings)
     fake_token = {
@@ -106,6 +121,8 @@ def test_custom_scheme_return_issues_code_and_exchange_sets_cookie(
         }
     }
     return_to = "com.learnenglish.app://auth/callback"
+    verifier = "a" * 43
+    challenge = pkce_challenge_s256(verifier)
 
     async def fake_create_authorization_url(self, redirect_uri, **kwargs):  # noqa: ANN001
         return {
@@ -117,11 +134,12 @@ def test_custom_scheme_return_issues_code_and_exchange_sets_cookie(
         "authlib.integrations.starlette_client.StarletteOAuth2App.create_authorization_url",
         new=fake_create_authorization_url,
     ):
-        client.get(
+        login = client.get(
             "/auth/google/login",
-            params={"return_to": return_to},
+            params={"return_to": return_to, "code_challenge": challenge},
             follow_redirects=False,
         )
+        assert login.status_code in {302, 307}
 
     with patch.object(
         oauth.google,
@@ -134,9 +152,23 @@ def test_custom_scheme_return_issues_code_and_exchange_sets_cookie(
     location = response.headers["location"]
     assert location.startswith(return_to)
     assert "code=" in location
+    assert "code_verifier=" not in location
     code = location.split("code=", 1)[1].split("&", 1)[0]
 
-    exchange = client.post("/auth/exchange", json={"code": code})
+    # Stolen deep-link code without verifier must fail (and leave code reusable).
+    stolen = client.post("/auth/exchange", json={"code": code})
+    assert stolen.status_code == 400
+
+    wrong = client.post(
+        "/auth/exchange",
+        json={"code": code, "code_verifier": "b" * 43},
+    )
+    assert wrong.status_code == 400
+
+    exchange = client.post(
+        "/auth/exchange",
+        json={"code": code, "code_verifier": verifier},
+    )
     assert exchange.status_code == 200
     assert exchange.json()["status"] == "ok"
     set_cookie = exchange.headers.get("set-cookie", "")
@@ -147,7 +179,10 @@ def test_custom_scheme_return_issues_code_and_exchange_sets_cookie(
     assert me.json()["email"] == "deeplink@example.com"
 
     # One-time use.
-    again = client.post("/auth/exchange", json={"code": code})
+    again = client.post(
+        "/auth/exchange",
+        json={"code": code, "code_verifier": verifier},
+    )
     assert again.status_code == 400
 
 

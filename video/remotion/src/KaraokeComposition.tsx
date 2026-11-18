@@ -1,5 +1,5 @@
 import React from 'react'
-import { AbsoluteFill, Sequence, useCurrentFrame } from 'remotion'
+import { AbsoluteFill, Html5Audio, Sequence, useCurrentFrame } from 'remotion'
 
 export type KaraokeLine = {
   speaker: string
@@ -49,6 +49,9 @@ export const KaraokeComposition: React.FC<KaraokeCompositionProps> = ({
               padding: 80,
             }}
           >
+            {item.audioUrl || item.audioPath ? (
+              <Html5Audio src={item.audioUrl || item.audioPath} />
+            ) : null}
             <div style={{ fontSize: 28, color: '#5eead4', marginBottom: 16 }}>
               {item.speaker}
             </div>

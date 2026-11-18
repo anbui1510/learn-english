@@ -50,16 +50,21 @@ FRONTEND_ORIGINS=https://localhost,capacitor://localhost,...
 ### OAuth return into the shell
 
 Native sign-in opens Google in a Custom Tab (`@capacitor/browser`) with
-`return_to=com.learnenglish.app://auth/callback`. After Google callback, the API
-redirects to that deep link with a **one-time** `code` (never the JWT). The app
-exchanges it via `POST /auth/exchange` and receives the `le_session` cookie.
+`return_to=com.learnenglish.app://auth/callback` plus a PKCE `code_challenge`.
+After Google callback, the API redirects to that deep link with a **one-time**
+`code` only (never the JWT, verifier, or client secret). The app sends
+`code` + `code_verifier` to `POST /auth/exchange` and receives the `le_session`
+cookie. Deep-link handling accepts only the exact `com.learnenglish.app://auth/callback`
+URL.
 
 Allowlist via `MOBILE_AUTH_RETURN_URIS` (defaults include `https://localhost/` and
 `com.learnenglish.app://auth/callback`). Unlisted `return_to` values fall back to
-`FRONTEND_ORIGIN`.
+`FRONTEND_ORIGIN`. Mobile `return_to` without `code_challenge` is rejected.
 
 For production mobile auth against HTTPS APIs, also set `COOKIE_SECURE=true` and
 `COOKIE_SAMESITE=none` so the WebView can store the session cookie cross-origin.
+
+See [secrets.md](./secrets.md) for where to put Google OAuth credentials.
 
 ## Mic permission
 
@@ -73,6 +78,10 @@ when permission is blocked.
 Opening a dialogue online stores lesson JSON (IndexedDB, last 3) and line audio
 (Cache API). Offline, `fetchLesson` / `fetchShadowing` fall back to cache and the
 UI shows an offline banner. Scoring, uploads, and new downloads still need network.
+Logout always clears IndexedDB + the audio Cache API store.
+
+Android `android:allowBackup` is **false** so session/offline data is not copied
+into automatic cloud/device backups.
 
 ## Sync after web changes
 

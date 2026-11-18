@@ -8,9 +8,10 @@ import {
 
 type Props = {
   onError: (message: string | null) => void
+  onCaseUploaded?: (draft: CaseDraft) => void
 }
 
-export function EditorUpload({ onError }: Props) {
+export function EditorUpload({ onError, onCaseUploaded }: Props) {
   const [title, setTitle] = useState('')
   const [isbn, setIsbn] = useState('')
   const [edition, setEdition] = useState('')
@@ -52,6 +53,7 @@ export function EditorUpload({ onError }: Props) {
         bookSourceId: bookSourceId === '' ? null : bookSourceId,
       })
       setCreated(draft)
+      onCaseUploaded?.(draft)
       setTitle('')
       setIsbn('')
       setEdition('')

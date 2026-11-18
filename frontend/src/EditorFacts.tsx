@@ -19,6 +19,10 @@ import {
 
 type Props = {
   onError: (message: string | null) => void
+  /** When set after upload, refresh the case list and select this id. */
+  focusCaseId?: number | null
+  /** Notify parent after publish so Learner practice can reload. */
+  onCasePublished?: (caseId: number) => void
 }
 
 const ALL_CONTEXTS: DialogueContext[] = [
@@ -41,7 +45,11 @@ async function waitForExtract(caseId: number): Promise<CaseDraft> {
   return getCase(caseId)
 }
 
-export function EditorFacts({ onError }: Props) {
+export function EditorFacts({
+  onError,
+  focusCaseId = null,
+  onCasePublished,
+}: Props) {
   const [cases, setCases] = useState<CaseDraft[]>([])
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [facts, setFacts] = useState<ClinicalFact[]>([])
@@ -106,6 +114,36 @@ export function EditorFacts({ onError }: Props) {
       cancelled = true
     }
   }, [onError])
+
+  // After a successful upload, reload cases and select the new draft.
+  useEffect(() => {
+    if (focusCaseId == null) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        await refreshCases()
+        if (!cancelled) {
+          setSelectedId(focusCaseId)
+          const draft = await getCase(focusCaseId)
+          if (!cancelled) {
+            setCases((prev) => {
+              const others = prev.filter((c) => c.id !== draft.id)
+              return [draft, ...others]
+            })
+          }
+        }
+      } catch (err) {
+        if (!cancelled) {
+          onError(
+            err instanceof Error ? err.message : 'Failed to open uploaded case',
+          )
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [focusCaseId, onError, refreshCases])
 
   useEffect(() => {
     if (selectedId == null) {
@@ -230,6 +268,7 @@ export function EditorFacts({ onError }: Props) {
       const draft = await publishCase(selectedId)
       setNote(`Case #${draft.id} published`)
       await refreshCases()
+      onCasePublished?.(draft.id)
     } catch (err) {
       onError(err instanceof Error ? err.message : 'Publish failed')
     } finally {
@@ -278,9 +317,18 @@ export function EditorFacts({ onError }: Props) {
       </p>
 
       {cases.length === 0 ? (
-        <p className="mt-4 text-sm text-slate-500">
-          Upload a PDF case first to enable extraction.
-        </p>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <p className="text-sm text-slate-500">
+            Upload a PDF case first to enable extraction.
+          </p>
+          <button
+            type="button"
+            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100"
+            onClick={() => void refreshCases().catch((err) => onError(err instanceof Error ? err.message : 'Refresh failed'))}
+          >
+            Refresh cases
+          </button>
+        </div>
       ) : (
         <div className="mt-4 flex flex-col gap-3">
           <label className="text-sm">
@@ -306,7 +354,15 @@ export function EditorFacts({ onError }: Props) {
               {selected.status === 'published' && selected.published_at
                 ? ` · published ${selected.published_at}`
                 : ''}
+              {selected.extract_status === 'succeeded' && facts.length === 0
+                ? ' · 0 facts matched (try Start extract again after a parser update, or use a chapter with Clinical Manifestations / Diagnosis / Treatment headings)'
+                : ''}
             </p>
+            {selected.status !== 'published' ? (
+              <p className="text-sm text-amber-800">
+                Next: verify facts below → Publish case → then Generate dialogues unlocks.
+              </p>
+            ) : null}
             <div className="grid gap-2 rounded border border-slate-200 p-3 text-sm sm:grid-cols-2">
               <label>
                 Module slug

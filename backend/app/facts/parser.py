@@ -72,11 +72,21 @@ def _pdf_text(pdf_bytes: bytes) -> str:
     return "\n".join(parts)
 
 
+def _canonical_heading(raw: str) -> str | None:
+    """Map Title Case / ALL CAPS / mixed headings onto CLINICAL_HEADINGS."""
+    key = " ".join(raw.split()).casefold()
+    for heading in CLINICAL_HEADINGS:
+        if heading.casefold() == key:
+            return heading
+    return None
+
+
 def _segments_from_text(text: str) -> list[ParsedSegment]:
     # Normalize line endings; keep content after %%EOF for fixture PDFs.
     normalized = text.replace("\r\n", "\n")
+    # Nelson PDFs often print section titles in ALL CAPS on their own line.
     heading_re = re.compile(
-        r"(?m)^(?P<head>"
+        r"(?mi)^(?P<head>"
         + "|".join(re.escape(h) for h in CLINICAL_HEADINGS)
         + r")\s*$"
     )
@@ -86,6 +96,9 @@ def _segments_from_text(text: str) -> list[ParsedSegment]:
 
     segments: list[ParsedSegment] = []
     for index, match in enumerate(matches):
+        category = _canonical_heading(match.group("head"))
+        if category is None:
+            continue
         start = match.end()
         end = matches[index + 1].start() if index + 1 < len(matches) else len(normalized)
         body = normalized[start:end].strip()
@@ -99,11 +112,11 @@ def _segments_from_text(text: str) -> list[ParsedSegment]:
         atomic = re.split(r"(?<=[.!?])\s+", quote, maxsplit=1)[0].strip() or quote
         segments.append(
             ParsedSegment(
-                category=match.group("head"),
+                category=category,
                 source_quote=quote,
                 atomic_fact=atomic,
                 page=1,
-                section=match.group("head"),
+                section=category,
             )
         )
     return segments

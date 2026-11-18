@@ -157,13 +157,16 @@ def build_karaoke_mp4(
             safe_title = title.replace(":", " ").replace("'", "")[:80]
             label = f"{speaker}: {text}"[:90].replace(":", " ")
             segment = work / f"seg-{index:03d}.mp4"
+            # Infinite color source + -shortest → segment length matches audio
+            # (a fixed d=1 previously clipped every line to 1s of silence).
+            color_src = f"color=c=0x0f172a:s={width}x{height}"
             cmd = [
                 "ffmpeg",
                 "-y",
                 "-f",
                 "lavfi",
                 "-i",
-                f"color=c=0x0f172a:s={width}x{height}:d=1",
+                color_src,
                 "-i",
                 str(audio),
                 "-shortest",
@@ -193,7 +196,7 @@ def build_karaoke_mp4(
                     "-f",
                     "lavfi",
                     "-i",
-                    f"color=c=0x0f172a:s={width}x{height}:d=1",
+                    color_src,
                     "-i",
                     str(audio),
                     "-shortest",

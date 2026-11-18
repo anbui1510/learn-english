@@ -133,7 +133,7 @@ TTS defaults to a silent-WAV synthetic engine (CI-safe). Set `USE_EDGE_TTS=true`
 
 **Pha 3 premium TTS:** org `tts_provider` + `premium_enabled` cost flag (`/admin/tts-settings`). Providers: synthetic / edge / Azure Neural / ElevenLabs (keys via env; premium gate required for paid engines). Learner karaoke shows engine + current-line voice badge from the lesson payload.
 
-**Pha 3 mobile (Capacitor):** Android + iOS shells under `frontend/android/` / `frontend/ios/` (`npm run cap:android` / `cap:ios`). OAuth deep-link return + offline karaoke cache (last 3 dialogues). See [docs/mobile-capacitor.md](docs/mobile-capacitor.md).
+**Pha 3 mobile (Capacitor):** Android + iOS shells under `frontend/android/` / `frontend/ios/` (`npm run cap:android` / `cap:ios`). OAuth deep-link return (PKCE) + offline karaoke cache (last 3 dialogues). See [docs/mobile-capacitor.md](docs/mobile-capacitor.md) and [docs/secrets.md](docs/secrets.md).
 
 **NFR-06 karaoke a11y:** keyboard ←/→/Home/End in the karaoke region, focus rings, live line announce, high-contrast active word. Checklist: [docs/a11y-karaoke.md](docs/a11y-karaoke.md).
 

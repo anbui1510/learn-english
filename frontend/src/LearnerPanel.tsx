@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   certificateShareUrl,
   completeLesson,
@@ -34,6 +34,8 @@ import { friendlyVoiceLabel } from './ttsLabels'
 
 type Props = {
   onError: (message: string | null) => void
+  /** Bump after editor publish so the case list reloads without a full page refresh. */
+  refreshKey?: number
 }
 
 type CaseDialogue = {
@@ -42,7 +44,7 @@ type CaseDialogue = {
   cefr_level: string
 }
 
-export function LearnerPanel({ onError }: Props) {
+export function LearnerPanel({ onError, refreshKey = 0 }: Props) {
   const [cases, setCases] = useState<PublishedCase[]>([])
   const [caseId, setCaseId] = useState<number | null>(null)
   const [dialogueId, setDialogueId] = useState<number | null>(null)
@@ -113,26 +115,32 @@ export function LearnerPanel({ onError }: Props) {
     setSrsCards(queue)
   }
 
+  const loadLearnerHome = useCallback(async () => {
+    const [listed, profile, queue, prog, tree] = await Promise.all([
+      listPublishedCases(),
+      fetchLearnerProfile(),
+      fetchSrsQueue(1),
+      fetchProgression(),
+      fetchSkillTree(),
+    ])
+    setCases(listed)
+    setLessonsPerWeek(profile.lessons_per_week)
+    setCefrPackage(profile.cefr_package)
+    setSrsCards(queue)
+    setProgression(prog)
+    setSkillTree(tree)
+    setCaseId((prev) => {
+      if (prev != null && listed.some((c) => c.id === prev)) return prev
+      const firstOpen = listed.find((c) => c.unlocked !== false)
+      return firstOpen?.id ?? listed[0]?.id ?? null
+    })
+  }, [])
+
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
-        const [listed, profile, queue, prog, tree] = await Promise.all([
-          listPublishedCases(),
-          fetchLearnerProfile(),
-          fetchSrsQueue(1),
-          fetchProgression(),
-          fetchSkillTree(),
-        ])
-        if (cancelled) return
-        setCases(listed)
-        setLessonsPerWeek(profile.lessons_per_week)
-        setCefrPackage(profile.cefr_package)
-        setSrsCards(queue)
-        setProgression(prog)
-        setSkillTree(tree)
-        const firstOpen = listed.find((c) => c.unlocked !== false)
-        if (firstOpen) setCaseId(firstOpen.id)
+        await loadLearnerHome()
       } catch (err) {
         if (!cancelled) {
           onError(
@@ -144,7 +152,7 @@ export function LearnerPanel({ onError }: Props) {
     return () => {
       cancelled = true
     }
-  }, [onError])
+  }, [onError, refreshKey, loadLearnerHome])
 
   useEffect(() => {
     if (caseId == null) return
@@ -355,7 +363,7 @@ export function LearnerPanel({ onError }: Props) {
     onError(null)
     try {
       setNote('Exporting 1080p MP4…')
-      const job = await exportDialogueVideo(dialogueId, 'remotion')
+      const job = await exportDialogueVideo(dialogueId, 'ffmpeg')
       if (job.status === 'succeeded' && job.download_url) {
         setNote(`Export ready (${job.width}×${job.height}, ${job.engine})`)
         window.open(job.download_url, '_blank', 'noopener,noreferrer')
@@ -557,9 +565,26 @@ export function LearnerPanel({ onError }: Props) {
         </button>
       </div>
 
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          className="rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100"
+          onClick={() =>
+            void loadLearnerHome().catch((err) =>
+              onError(
+                err instanceof Error ? err.message : 'Failed to refresh cases',
+              ),
+            )
+          }
+        >
+          Refresh published cases
+        </button>
+      </div>
+
       {cases.length === 0 ? (
         <p className="mt-4 text-sm text-slate-500">
-          No published cases yet. Ask an editor to publish one.
+          No published cases yet. Ask an editor to publish one — then click
+          Refresh published cases.
         </p>
       ) : (
         <div className="mt-6 flex flex-col gap-3">
