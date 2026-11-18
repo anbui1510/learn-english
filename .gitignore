@@ -15,6 +15,7 @@ backend/data/
 # Content Studio runtime artifacts
 content/data/
 content/.venv/
+video/remotion/public/studio-audio/
 
 # Python
 .venv/

@@ -96,10 +96,24 @@ def _speaker_label(speaker: str) -> str:
 
 
 def _avatar_for_speaker(speaker: str) -> str:
+    """Map speaker role → Remotion public/ avatar (real portraits, not 8×8 stubs)."""
     key = speaker.strip().lower()
+    role_avatars = {
+        "doctor": "avatars/doctor.jpg",
+        "expert": "avatars/expert.jpg",
+        "colleague": "avatars/colleague.jpg",
+        "learner": "avatars/colleague.jpg",
+        "parent": "avatars/parent.jpg",
+        "mother": "avatars/parent.jpg",
+        "family": "avatars/parent.jpg",
+        "nurse": "avatars/parent.jpg",
+        "jenny": "avatars/parent.jpg",
+    }
+    if key in role_avatars:
+        return role_avatars[key]
     if key in FEMALE_SPEAKERS:
-        return "avatars/female.png"
-    return "avatars/male.png"
+        return "avatars/parent.jpg"
+    return "avatars/doctor.jpg"
 
 
 def build_dualtalk_props(case_dir: Path, stem: str) -> dict[str, object]:
@@ -125,9 +139,11 @@ def build_dualtalk_props(case_dir: Path, stem: str) -> dict[str, object]:
     speaker_order: list[str] = []
     for entry in timestamps.get("lines") or []:
         line_index = int(entry.get("line_index", 0))
-        speaker = str(entry.get("speaker") or "speaker")
-        if speaker not in speaker_order:
-            speaker_order.append(speaker)
+        speaker = str(entry.get("speaker") or "speaker").strip()
+        speaker_key = speaker.lower()
+        if speaker_key not in speaker_order:
+            speaker_order.append(speaker_key)
+        speaker = speaker_key
         copy = text_by_index.get(line_index, {})
         words = entry.get("words") or []
         lines_out.append(
@@ -164,6 +180,16 @@ def build_dualtalk_props(case_dir: Path, stem: str) -> dict[str, object]:
     if not full_audio.is_file():
         raise FileNotFoundError(f"Missing full audio: {full_audio}")
 
+    # Remotion can only load media from http(s) or files under public/ via staticFile.
+    # Stage a copy under video/remotion/public/studio-audio/<case>/<stem>.<ext>.
+    case_id = case_dir.name
+    ext = full_audio.suffix.lstrip(".") or "mp3"
+    public_rel = f"studio-audio/{case_id}/{stem}.{ext}"
+    staged = REMOTION_ROOT / "public" / public_rel
+    staged.parent.mkdir(parents=True, exist_ok=True)
+    if not staged.is_file() or staged.stat().st_mtime < full_audio.stat().st_mtime:
+        shutil.copy2(full_audio, staged)
+
     duration_ms = int(timestamps.get("duration_ms") or 0)
     if duration_ms <= 0 and lines_out:
         last = lines_out[-1]
@@ -175,7 +201,9 @@ def build_dualtalk_props(case_dir: Path, stem: str) -> dict[str, object]:
         "edition": str(case_meta.get("edition") or ""),
         "fps": FPS,
         "durationMs": max(duration_ms, 1000),
-        "fullAudioPath": str(full_audio.resolve()),
+        # Remotion reads staged public/ path; ffmpeg fallback uses absolute case audio.
+        "fullAudioPath": public_rel,
+        "sourceAudioPath": str(full_audio.resolve()),
         "speakers": speakers_out,
         "lines": lines_out,
     }
@@ -349,7 +377,9 @@ def render_dialogue(
         if output_path.is_file() and output_path.stat().st_size > 0:
             engine = "remotion"
     except Exception:
-        audio_path = Path(str(props["fullAudioPath"]))
+        audio_path = Path(
+            str(props.get("sourceAudioPath") or props.get("fullAudioPath") or "")
+        )
         _ffmpeg_render_dualtalk(
             output_path=output_path,
             props=props,
