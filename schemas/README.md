@@ -9,6 +9,7 @@ Downstream extraction, ingest, and dialogue epics should import these files rath
 |----------|------|--------|
 | Clinical fact card | `schemas/clinical-fact.schema.json` | `source_quote`, `metadata` (ISBN, edition, page, optional chapter/section), `atomic_fact`, `category`, `status` ∈ `needs_review` \| `verified`, optional `id` |
 | Dialogue artifact | `schemas/dialogue.schema.json` | `context` ∈ `patient_family` \| `colleague_sbar` \| `expert_cme`, `cefr_level` ∈ `A2` \| `B1` \| `C1`, `lines[]` each with non-empty `fact_ids` |
+| Studio dialogue | `schemas/studio-dialogue.schema.json` | Same contexts/CEFR as learner dialogue; requires `status` ∈ `draft` \| `needs_review` \| `accepted` \| `rejected`; lines require `speaker` + non-empty `text`; optional `source_quote`, `page`, `text_vi`, `is_key_phrase`, `fact_ids` |
 | Case | `schemas/case.schema.json` | `owner_user_id` (editor/admin user id), `title`, `status` ∈ `draft` \| `published`, optional ISBN/edition, optional `pdf_object_key` / `pdf_content_type` / `pdf_byte_size` |
 
 ## Fixtures
@@ -19,6 +20,8 @@ Downstream extraction, ingest, and dialogue epics should import these files rath
 | Invalid fact | `schemas/fixtures/clinical-fact.invalid.json` | Fails (missing `source_quote`, illegal `status`) |
 | Valid dialogue | `schemas/fixtures/dialogue.valid.json` | Passes |
 | Invalid dialogue | `schemas/fixtures/dialogue.invalid-empty-fact-ids.json` | Fails (empty `fact_ids`) |
+| Valid studio dialogue | `schemas/fixtures/studio-dialogue.valid.json` | Passes |
+| Invalid studio dialogue | `schemas/fixtures/studio-dialogue.invalid-empty-text.json` | Fails (empty `text` on a line) |
 | Valid case | `schemas/fixtures/case.valid.json` | Passes |
 | Invalid case | `schemas/fixtures/case.invalid-missing-owner.json` | Fails (missing `owner_user_id`) |
 
