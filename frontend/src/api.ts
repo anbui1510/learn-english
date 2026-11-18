@@ -1,12 +1,66 @@
 import {
   cacheDialogueOffline,
+  clearOfflineCache,
   isBrowserOffline,
   readCachedDialogue,
 } from './offlineCache'
 
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') ??
-  'http://127.0.0.1:8000'
+/** Dev-only localhost default. Production refuses plain HTTP API bases. */
+function resolveApiBase(): string {
+  const configured = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/$/, '')
+  if (configured) {
+    if (
+      import.meta.env.PROD &&
+      !configured.startsWith('https://') &&
+      !configured.startsWith('/')
+    ) {
+      console.error(
+        'VITE_API_BASE_URL must be https:// or a same-origin path in production',
+      )
+      return ''
+    }
+    return configured
+  }
+  if (import.meta.env.DEV) {
+    return 'http://127.0.0.1:8000'
+  }
+  // Same-origin relative (deploy behind a reverse proxy that serves /auth, /learner, …).
+  return ''
+}
+
+const API_BASE = resolveApiBase()
+
+const PKCE_VERIFIER_KEY = 'le_oauth_code_verifier'
+
+function bytesToBase64Url(bytes: ArrayBuffer): string {
+  const bin = String.fromCharCode(...new Uint8Array(bytes))
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+/** RFC 7636 S256 pair; verifier stays on-device, never in the deep-link URL. */
+export async function createPkcePair(): Promise<{
+  verifier: string
+  challenge: string
+}> {
+  const raw = new Uint8Array(32)
+  crypto.getRandomValues(raw)
+  const verifier = bytesToBase64Url(raw.buffer)
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(verifier),
+  )
+  return { verifier, challenge: bytesToBase64Url(digest) }
+}
+
+export function storePkceVerifier(verifier: string): void {
+  sessionStorage.setItem(PKCE_VERIFIER_KEY, verifier)
+}
+
+export function takePkceVerifier(): string | null {
+  const value = sessionStorage.getItem(PKCE_VERIFIER_KEY)
+  sessionStorage.removeItem(PKCE_VERIFIER_KEY)
+  return value
+}
 
 export type Role = 'admin' | 'editor' | 'learner'
 
@@ -26,23 +80,34 @@ export type AdminUser = {
   google_sub: string
 }
 
-export function loginUrl(returnTo?: string): string {
-  const base = `${API_BASE}/auth/google/login`
-  if (!returnTo) return base
-  const url = new URL(base)
-  url.searchParams.set('return_to', returnTo)
+export function loginUrl(returnTo?: string, codeChallenge?: string): string {
+  const path = API_BASE
+    ? `${API_BASE}/auth/google/login`
+    : '/auth/google/login'
+  if (!returnTo && !codeChallenge) return path
+  const url = API_BASE
+    ? new URL(`${API_BASE}/auth/google/login`)
+    : new URL('/auth/google/login', window.location.origin)
+  if (returnTo) url.searchParams.set('return_to', returnTo)
+  if (codeChallenge) url.searchParams.set('code_challenge', codeChallenge)
   return url.toString()
 }
 
 /** Capacitor deep-link target used after Google OAuth (Custom Tab / Browser). */
 export const MOBILE_AUTH_RETURN_URI = 'com.learnenglish.app://auth/callback'
 
-export async function exchangeAuthCode(code: string): Promise<void> {
+export async function exchangeAuthCode(
+  code: string,
+  codeVerifier?: string,
+): Promise<void> {
   const response = await fetch(`${API_BASE}/auth/exchange`, {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code }),
+    body: JSON.stringify({
+      code,
+      ...(codeVerifier ? { code_verifier: codeVerifier } : {}),
+    }),
   })
   if (!response.ok) {
     throw new Error(`Auth exchange failed (${response.status})`)
@@ -63,12 +128,17 @@ export async function fetchMe(): Promise<AuthUser | null> {
 }
 
 export async function logout(): Promise<void> {
-  const response = await fetch(`${API_BASE}/auth/logout`, {
-    method: 'POST',
-    credentials: 'include',
-  })
-  if (!response.ok) {
-    throw new Error(`Logout failed (${response.status})`)
+  try {
+    const response = await fetch(`${API_BASE}/auth/logout`, {
+      method: 'POST',
+      credentials: 'include',
+    })
+    if (!response.ok) {
+      throw new Error(`Logout failed (${response.status})`)
+    }
+  } finally {
+    // Always drop offline lesson/audio cache so a later device user cannot read it.
+    await clearOfflineCache().catch(() => undefined)
   }
 }
 

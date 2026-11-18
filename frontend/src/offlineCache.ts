@@ -167,3 +167,30 @@ export async function resolveLessonAudioUrl(
 export function isBrowserOffline(): boolean {
   return typeof navigator !== 'undefined' && navigator.onLine === false
 }
+
+/** Wipe IndexedDB dialogue metadata and Cache API audio (call on logout). */
+export async function clearOfflineCache(): Promise<void> {
+  if (typeof indexedDB !== 'undefined') {
+    try {
+      const rows = await idbList()
+      for (const row of rows) {
+        await idbDelete(row.dialogueId)
+      }
+    } catch {
+      // ignore
+    }
+    await new Promise<void>((resolve) => {
+      const req = indexedDB.deleteDatabase(META_DB)
+      req.onsuccess = () => resolve()
+      req.onerror = () => resolve()
+      req.onblocked = () => resolve()
+    })
+  }
+  if (typeof caches !== 'undefined') {
+    try {
+      await caches.delete(AUDIO_CACHE)
+    } catch {
+      // ignore
+    }
+  }
+}
