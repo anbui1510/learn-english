@@ -52,9 +52,10 @@ def test_generate_skips_accepted_dialogue(tmp_path, monkeypatch):
     assert kept["lines"][0]["text"] == "KEEP_THIS_ACCEPTED_LINE"
 
 
-def test_generate_non_mock_raises_not_implemented(tmp_path, monkeypatch):
+def test_generate_non_mock_raises_without_api_key(tmp_path, monkeypatch):
     _ingest_otitis(tmp_path, monkeypatch)
-    with pytest.raises(NotImplementedError):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    with pytest.raises(RuntimeError, match="GEMINI_API_KEY"):
         generate_dialogues("otitis-demo", mock=False)
 
 
